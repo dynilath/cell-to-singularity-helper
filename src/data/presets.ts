@@ -122,7 +122,6 @@ export const PRESETS: Preset[] = [
       '文档数据尚未填写完整，后续可能继续补充。',
       '点击收益升级「血液」「静脉」未纳入工厂产出规划；因此「心脏」的解锁条件暂未建模，其余工厂/升级前置已转成锁定条件。',
       '「内分泌系统」需要至少 5 台才能解锁「骨骼」，该数量条件已保留。',
-      '文档中「软骨」出现了两次，分别对应「骨头」和「肌肉」前置，这里暂命名为「软骨（骨骼）」「软骨（肌肉）」。',
       '工厂价格增长倍率未在文档中给出，暂用 1.15。',
     ],
     factories: [
@@ -152,9 +151,8 @@ export const PRESETS: Preset[] = [
       { name: '脑垂体', cost: 3.6e7, costResource: 'blue', unlock: '下丘脑', effect: { kind: 'factory', target: '内分泌系统', multiplier: 2.5 } },
       { name: '性腺', cost: 2e8, costResource: 'blue', unlock: '肾上腺', effect: { kind: 'factory', target: '内分泌系统', multiplier: 4 } },
       { name: '骨头', cost: 1.5e10, costResource: 'blue', unlock: '骨骼', effect: { kind: 'factory', target: '骨骼', multiplier: 6 } },
-      { name: '软骨（骨骼）', cost: 2e14, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 41 } },
+      { name: '软骨', cost: 2e14, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 41 } },
       { name: '骨髓', cost: 3e11, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 11 } },
-      { name: '软骨（肌肉）', cost: 2e14, costResource: 'blue', unlock: '肌肉', effect: { kind: 'factory', target: '骨骼', multiplier: 41 } },
       { name: '骨骼肌肉', cost: 2e12, costResource: 'blue', unlock: '肌肉', effect: { kind: 'factory', target: '肌肉', multiplier: 26 } },
       { name: '支气管', cost: 8e12, costResource: 'blue', unlock: '肺', effect: { kind: 'factory', target: '肺', multiplier: 3 } },
       { name: '耳朵', cost: 7.5e13, costResource: 'blue', unlock: '支气管', effect: { kind: 'factory', target: '大脑', multiplier: 3.5 } },

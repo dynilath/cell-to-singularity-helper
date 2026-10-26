@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRESETS, PRESET_DOC_LEVEL, buildPresetStore } from '../src/data/presets.ts';
+import { RESOURCE_EMOJIS } from '../src/data/schema.ts';
 import { buildState } from '../src/core/exploration.ts';
 import { planExploration } from '../src/core/planner.ts';
 
@@ -14,6 +15,9 @@ describe('life anatomy preset', () => {
   it('imports two resources and cross-resource factories', () => {
     const store = buildPresetStore(anatomyPreset, { level: 2, badgePercent: 0 });
     expect(store.resources.map((resource) => resource.emoji)).toEqual(['🔵', '🔴']);
+    expect(
+      store.resources.every((resource) => RESOURCE_EMOJIS.includes(resource.emoji)),
+    ).toBe(true);
 
     const blue = store.resources.find((resource) => resource.emoji === '🔵');
     const red = store.resources.find((resource) => resource.emoji === '🔴');

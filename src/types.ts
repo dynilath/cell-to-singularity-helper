@@ -5,6 +5,8 @@ export type GlobalAdMultiplier = 1 | 2 | 4;
 export interface Requirement {
   type: 'factory' | 'upgrade';
   id: string;
+  /** 工厂前置要求的最少已拥有数量，默认 1。 */
+  owned?: number;
 }
 
 export interface RawResource {

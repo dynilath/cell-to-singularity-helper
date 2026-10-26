@@ -191,7 +191,15 @@ function normalizeRequirement(raw) {
   if (!isRecord(raw)) return null;
   if (raw.type !== 'factory' && raw.type !== 'upgrade') return null;
   const id = toText(raw.id);
-  return id ? { type: raw.type, id } : null;
+  if (!id) return null;
+  const owned = toNumber(raw.owned);
+  return {
+    type: raw.type,
+    id,
+    ...(raw.type === 'factory' && owned !== null && owned >= 1
+      ? { owned: Math.floor(owned) }
+      : {}),
+  };
 }
 
 function normalizeFactory(raw, index, resourceIds) {

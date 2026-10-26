@@ -1110,6 +1110,24 @@ describe('resources and notation', () => {
     expect(context.document.getElementById('preset-note').textContent).toContain('徽章 +10%');
   });
 
+  it('imports the life anatomy preset with two cross-resource resources', () => {
+    const context = boot();
+    click(context, '#fab-btn');
+    click(context, '#preset-open');
+    const select = context.document.getElementById('preset-select');
+    select.value = 'anatomy';
+    select.dispatchEvent(new context.window.Event('change', { bubbles: true }));
+    click(context, '#preset-import');
+
+    const store = savedStore(context);
+    expect(store.resources.map((resource) => resource.emoji)).toEqual(['🔵', '🔴']);
+    expect(store.factories).toHaveLength(7);
+    expect(store.factories.map((factory) => factory.name)).toContain('心脏');
+    expect(store.factories.map((factory) => factory.name)).toContain('皮肤');
+    expect(store.preset).toMatchObject({ id: 'anatomy', level: 2, badgePercent: 0 });
+    expect(context.document.querySelectorAll('#resource-rows .res-row')).toHaveLength(2);
+  });
+
   it('converts resource/factory/upgrade values when notation changes', () => {
     const context = boot(
       sampleStore({

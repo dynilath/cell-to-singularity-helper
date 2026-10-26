@@ -30,8 +30,9 @@ export function requirementReason(group, requires) {
   }
   if (requires.type === 'factory') {
     const factory = group.factories.find((item) => item.id === requires.id);
-    if (factory && (parseNum(factory.owned) || 0) >= 1) return null;
-    return `需先拥有「${factoryName(group, requires.id)}」至少 1 台`;
+    const need = Math.max(1, Number(requires.owned) || 1);
+    if (factory && (parseNum(factory.owned) || 0) >= need) return null;
+    return `需先拥有「${factoryName(group, requires.id)}」至少 ${need} 台`;
   }
   return null;
 }

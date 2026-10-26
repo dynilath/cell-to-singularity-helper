@@ -4,10 +4,57 @@ import { buildState } from '../src/core/exploration.ts';
 import { planExploration } from '../src/core/planner.ts';
 
 const preset = PRESETS[0];
+const anatomyPreset = PRESETS.find((item) => item.id === 'anatomy');
 
 function findFactory(store, name) {
   return store.factories.find((factory) => factory.name === name);
 }
+
+describe('life anatomy preset', () => {
+  it('imports two resources and cross-resource factories', () => {
+    const store = buildPresetStore(anatomyPreset, { level: 2, badgePercent: 0 });
+    expect(store.resources.map((resource) => resource.emoji)).toEqual(['🔵', '🔴']);
+
+    const blue = store.resources.find((resource) => resource.emoji === '🔵');
+    const red = store.resources.find((resource) => resource.emoji === '🔴');
+    const heart = findFactory(store, '心脏');
+    const brain = findFactory(store, '大脑');
+    const lung = findFactory(store, '肺');
+
+    expect(heart).toMatchObject({
+      price: '100',
+      unit: '1',
+      costResourceId: blue.id,
+      outputResourceId: red.id,
+    });
+    expect(brain).toMatchObject({
+      price: '1.50K',
+      unit: '1',
+      costResourceId: red.id,
+      outputResourceId: blue.id,
+    });
+    expect(lung).toMatchObject({
+      price: '10.0T',
+      unit: '505M',
+      costResourceId: blue.id,
+      outputResourceId: red.id,
+    });
+  });
+
+  it('keeps the five-endocrine requirement and omits click-only upgrades', () => {
+    const store = buildPresetStore(anatomyPreset, { level: 2, badgePercent: 0 });
+    const endocrine = findFactory(store, '内分泌系统');
+    const bone = findFactory(store, '骨骼');
+    expect(bone.requires).toEqual({
+      type: 'factory',
+      id: endocrine.id,
+      owned: 5,
+    });
+    expect(store.upgrades.some((upgrade) => upgrade.name === '血液')).toBe(false);
+    expect(store.upgrades.some((upgrade) => upgrade.name === '静脉')).toBe(false);
+    expect(findFactory(store, '心脏').requires).toBeNull();
+  });
+});
 
 describe('fear preset', () => {
   it('imports the documented level-2 factories and multiplier upgrades with names', () => {

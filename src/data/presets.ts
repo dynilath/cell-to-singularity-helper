@@ -5,15 +5,61 @@
  * 导入时按当前声望等级和徽章加成重新换算：
  *   收入倍率 = 2^(level-2) × (1 + badgePercent/100)
  *   成本倍率 = 4^(level-2)
+ *
+ * 产出文档还包含全局广告 ×4；存档保存不含广告倍率的基准产出，
+ * 页面顶部的「全局广告倍率」再决定实际产出。
  */
 
 import { fmtNum } from '../core/numbers.ts';
+import type { Requirement } from '../types.ts';
 
 export const PRESET_DOC_LEVEL = 2;
 /** 文档产出按全局广告 ×4 记录；存档保存不含广告倍率的基准产出。 */
 export const PRESET_DOC_GLOBAL_AD = 4;
 
-export const PRESETS = [
+interface PresetResource {
+  key: string;
+  name: string;
+  emoji: string;
+}
+
+interface PresetFactory {
+  name: string;
+  cost: number;
+  output: number;
+  costResource?: string;
+  outputResource?: string;
+  unlock?: string;
+}
+
+interface PresetUpgradeEffect {
+  kind: 'factory' | 'click';
+  target?: string;
+  multiplier?: number;
+  add?: number;
+}
+
+interface PresetUpgrade {
+  name: string;
+  cost: number;
+  costResource?: string;
+  unlock?: string;
+  effect: PresetUpgradeEffect;
+}
+
+interface Preset {
+  id: string;
+  title: string;
+  source: string;
+  emoji?: string;
+  resources?: PresetResource[];
+  factoryGrowth?: number;
+  notes: string[];
+  factories: PresetFactory[];
+  upgrades: PresetUpgrade[];
+}
+
+export const PRESETS: Preset[] = [
   {
     id: 'fear',
     title: '微型探索 · 面对恐惧',
@@ -61,28 +107,116 @@ export const PRESETS = [
       { name: 'Jimothy', cost: 4e18, unlock: '大脚怪', effect: { kind: 'factory', target: '诡异生物', multiplier: 2 } },
     ],
   },
+  {
+    id: 'anatomy',
+    title: '生命解剖学',
+    source: 'docs/生命解剖学.md',
+    resources: [
+      { key: 'blue', name: '脱氧血液', emoji: '🔵' },
+      { key: 'red', name: '带氧血液', emoji: '🔴' },
+    ],
+    factoryGrowth: 1.15,
+    notes: [
+      '文档数值包含全局广告 ×4；导入时先除以 4 存成基准产出，请在页面顶部选择实际广告倍率。',
+      '当前文档未标注声望基准，导入界面默认按声望 2 的倍率换算；请按游戏实际声望调整。',
+      '文档数据尚未填写完整，后续可能继续补充。',
+      '点击收益升级「血液」「静脉」未纳入工厂产出规划；因此「心脏」的解锁条件暂未建模，其余工厂/升级前置已转成锁定条件。',
+      '「内分泌系统」需要至少 5 台才能解锁「骨骼」，该数量条件已保留。',
+      '文档中「软骨」出现了两次，分别对应「骨头」和「肌肉」前置，这里暂命名为「软骨（骨骼）」「软骨（肌肉）」。',
+      '工厂价格增长倍率未在文档中给出，暂用 1.15。',
+    ],
+    factories: [
+      { name: '心脏', cost: 100, output: 4, costResource: 'blue', outputResource: 'red', unlock: '静脉' },
+      { name: '大脑', cost: 1500, output: 4, costResource: 'red', outputResource: 'blue', unlock: '脑干' },
+      { name: '内分泌系统', cost: 7.5e6, output: 480, costResource: 'red', outputResource: 'blue', unlock: '顶叶' },
+      { name: '骨骼', cost: 8e9, output: 1e6, costResource: 'red', outputResource: 'blue', unlock: '内分泌系统x5' },
+      { name: '肌肉', cost: 1e11, output: 1.2e8, costResource: 'red', outputResource: 'blue', unlock: '骨头' },
+      { name: '肺', cost: 1e13, output: 2.02e9, costResource: 'blue', outputResource: 'red', unlock: '骨骼肌肉' },
+      { name: '皮肤', cost: 1e16, output: 1.2e13, costResource: 'red', outputResource: 'blue', unlock: '肺' },
+    ],
+    upgrades: [
+      { name: '血液', cost: 25, costResource: 'blue', unlock: '无', effect: { kind: 'click', add: 1 } },
+      { name: '静脉', cost: 75, costResource: 'blue', unlock: '血液', effect: { kind: 'click', add: 2 } },
+      { name: '脊髓', cost: 300, costResource: 'red', unlock: '心脏', effect: { kind: 'factory', target: '心脏', multiplier: 2 } },
+      { name: '脑干', cost: 1000, costResource: 'red', unlock: '脊髓', effect: { kind: 'factory', target: '心脏', multiplier: 2 } },
+      { name: '神经', cost: 500, costResource: 'red', unlock: '脊髓', effect: { kind: 'factory', target: '心脏', multiplier: 2 } },
+      { name: '顶叶', cost: 750000, costResource: 'blue', unlock: '大脑', effect: { kind: 'factory', target: '大脑', multiplier: 2.25 } },
+      { name: '颞叶', cost: 90000, costResource: 'blue', unlock: '大脑', effect: { kind: 'factory', target: '大脑', multiplier: 2 } },
+      { name: '枕叶', cost: 5000, costResource: 'blue', unlock: '大脑', effect: { kind: 'factory', target: '大脑', multiplier: 2 } },
+      { name: '前额叶', cost: 2000, costResource: 'blue', unlock: '大脑', effect: { kind: 'factory', target: '大脑', multiplier: 2 } },
+      { name: '眼睛', cost: 25000, costResource: 'blue', unlock: '枕叶', effect: { kind: 'factory', target: '大脑', multiplier: 1.75 } },
+      { name: '右心房', cost: 4e6, costResource: 'blue', unlock: '颞叶', effect: { kind: 'factory', target: '心脏', multiplier: 126 } },
+      { name: '右心室', cost: 1e9, costResource: 'blue', unlock: '右心房', effect: { kind: 'factory', target: '心脏', multiplier: 76 } },
+      { name: '肾上腺', cost: 6e7, costResource: 'blue', unlock: '内分泌系统', effect: { kind: 'factory', target: '内分泌系统', multiplier: 2.5 } },
+      { name: '下丘脑', cost: 1.2e7, costResource: 'blue', unlock: '内分泌系统', effect: { kind: 'factory', target: '内分泌系统', multiplier: 2 } },
+      { name: '脑垂体', cost: 3.6e7, costResource: 'blue', unlock: '下丘脑', effect: { kind: 'factory', target: '内分泌系统', multiplier: 2.5 } },
+      { name: '性腺', cost: 2e8, costResource: 'blue', unlock: '肾上腺', effect: { kind: 'factory', target: '内分泌系统', multiplier: 4 } },
+      { name: '骨头', cost: 1.5e10, costResource: 'blue', unlock: '骨骼', effect: { kind: 'factory', target: '骨骼', multiplier: 6 } },
+      { name: '软骨（骨骼）', cost: 2e14, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 41 } },
+      { name: '骨髓', cost: 3e11, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 11 } },
+      { name: '软骨（肌肉）', cost: 2e14, costResource: 'blue', unlock: '肌肉', effect: { kind: 'factory', target: '骨骼', multiplier: 41 } },
+      { name: '骨骼肌肉', cost: 2e12, costResource: 'blue', unlock: '肌肉', effect: { kind: 'factory', target: '肌肉', multiplier: 26 } },
+      { name: '支气管', cost: 8e12, costResource: 'blue', unlock: '肺', effect: { kind: 'factory', target: '肺', multiplier: 3 } },
+      { name: '耳朵', cost: 7.5e13, costResource: 'blue', unlock: '支气管', effect: { kind: 'factory', target: '大脑', multiplier: 3.5 } },
+      { name: '鼻子', cost: 1e13, costResource: 'blue', unlock: '支气管', effect: { kind: 'factory', target: '大脑', multiplier: 1500001 } },
+      { name: '肺泡', cost: 4e15, costResource: 'blue', unlock: '支气管', effect: { kind: 'factory', target: '肺', multiplier: 51 } },
+    ],
+  },
 ];
 
-function presetNumber(value) {
+function presetNumber(value: number) {
   return fmtNum(Number(value));
 }
 
+function parseUnlock(
+  unlock: string | undefined,
+  factoryIdByName: Map<string, string>,
+  upgradeIdByName: Map<string, string>,
+): Requirement | null {
+  if (!unlock || unlock === '无') return null;
+  const match = /^(.*?)(?:x(\d+))?$/.exec(unlock);
+  const name = match?.[1] ?? unlock;
+  const count = match?.[2] ? Number(match[2]) : 1;
+  const factoryId = factoryIdByName.get(name);
+  if (factoryId) {
+    return { type: 'factory', id: factoryId, ...(count > 1 ? { owned: count } : {}) };
+  }
+  const upgradeId = upgradeIdByName.get(name);
+  if (upgradeId) return { type: 'upgrade', id: upgradeId };
+  return null;
+}
+
 /** 生成可直接写入存档的预设状态。 */
-export function buildPresetStore(preset, { level = PRESET_DOC_LEVEL, badgePercent = 0, now = Date.now() } = {}) {
+export function buildPresetStore(preset: Preset, { level = PRESET_DOC_LEVEL, badgePercent = 0, now = Date.now() } = {}) {
   const safeLevel = Number.isInteger(level) && level >= 1 ? level : PRESET_DOC_LEVEL;
   const safeBadge = Number.isFinite(badgePercent) && badgePercent >= 0 ? badgePercent : 0;
   const costScale = 4 ** (safeLevel - PRESET_DOC_LEVEL);
   const incomeScale = 2 ** (safeLevel - PRESET_DOC_LEVEL) * (1 + safeBadge / 100);
 
-  const resource = {
-    id: `preset_${preset.id}_res`,
-    emoji: preset.emoji,
+  const resourceDefs: PresetResource[] =
+    preset.resources && preset.resources.length > 0
+      ? preset.resources
+      : [{ key: 'main', name: '', emoji: preset.emoji ?? '🔥' }];
+  const resources = resourceDefs.map((resource) => ({
+    id:
+      resourceDefs.length === 1
+        ? `preset_${preset.id}_res`
+        : `preset_${preset.id}_res_${resource.key}`,
+    emoji: resource.emoji,
     amount: '0',
     baseRate: '0',
-  };
+  }));
+  const resourceIdByKey = new Map(
+    resourceDefs.map((resource, index) => [resource.key, resources[index].id]),
+  );
+  const fallbackResourceId = resources[0].id;
+  const resolveResource = (key?: string) =>
+    (key ? resourceIdByKey.get(key) : undefined) ?? fallbackResourceId;
+
   const importedUpgrades = preset.upgrades.filter(
     (upgrade) =>
       upgrade.effect.kind === 'factory' &&
+      upgrade.effect.target &&
       preset.factories.some((factory) => factory.name === upgrade.effect.target),
   );
   const upgradeIdByName = new Map(
@@ -91,50 +225,40 @@ export function buildPresetStore(preset, { level = PRESET_DOC_LEVEL, badgePercen
       `preset_${preset.id}_upg_${index}`,
     ]),
   );
+  const factoryIdByName = new Map(
+    preset.factories.map((factory, index) => [
+      factory.name,
+      `preset_${preset.id}_fac_${index}`,
+    ]),
+  );
 
-  const factories = preset.factories.map((factory, index) => {
-    const requiredUpgradeId = upgradeIdByName.get(factory.unlock);
-    return {
-      id: `preset_${preset.id}_fac_${index}`,
-      name: factory.name,
-      price: presetNumber(factory.cost * costScale),
-      unit: presetNumber((factory.output / PRESET_DOC_GLOBAL_AD) * incomeScale),
-      growth: preset.factoryGrowth ? presetNumber(preset.factoryGrowth) : '',
-      owned: '0',
-      outputResourceId: resource.id,
-      costResourceId: resource.id,
-      requires: requiredUpgradeId ? { type: 'upgrade', id: requiredUpgradeId } : null,
-    };
-  });
-  const factoryIdByName = new Map(factories.map((factory) => [factory.name, factory.id]));
-  const upgrades = importedUpgrades
-    .map((upgrade, index) => {
-      const targetFactoryId = factoryIdByName.get(upgrade.effect.target);
-      if (!targetFactoryId) return null;
-      const requiredFactoryId = factoryIdByName.get(upgrade.unlock);
-      const requiredUpgradeId = upgradeIdByName.get(upgrade.unlock);
-      const requires = requiredFactoryId
-        ? { type: 'factory', id: requiredFactoryId }
-        : requiredUpgradeId
-          ? { type: 'upgrade', id: requiredUpgradeId }
-          : null;
-      return {
-        id: `preset_${preset.id}_upg_${index}`,
-        name: upgrade.name,
-        cost: presetNumber(upgrade.cost * costScale),
-        costResourceId: resource.id,
-        targetFactoryId,
-        multiplier: presetNumber(upgrade.effect.multiplier),
-        purchased: false,
-        requires,
-      };
-    })
-    .filter(Boolean);
+  const factories = preset.factories.map((factory) => ({
+    id: factoryIdByName.get(factory.name),
+    name: factory.name,
+    price: presetNumber(factory.cost * costScale),
+    unit: presetNumber((factory.output / PRESET_DOC_GLOBAL_AD) * incomeScale),
+    growth: preset.factoryGrowth ? presetNumber(preset.factoryGrowth) : '',
+    owned: '0',
+    outputResourceId: resolveResource(factory.outputResource),
+    costResourceId: resolveResource(factory.costResource),
+    requires: parseUnlock(factory.unlock, factoryIdByName, upgradeIdByName),
+  }));
+
+  const upgrades = importedUpgrades.map((upgrade, index) => ({
+    id: `preset_${preset.id}_upg_${index}`,
+    name: upgrade.name,
+    cost: presetNumber(upgrade.cost * costScale),
+    costResourceId: resolveResource(upgrade.costResource),
+    targetFactoryId: factoryIdByName.get(upgrade.effect.target as string),
+    multiplier: presetNumber(upgrade.effect.multiplier ?? 1),
+    purchased: false,
+    requires: parseUnlock(upgrade.unlock, factoryIdByName, upgradeIdByName),
+  }));
 
   return {
     globalGrowth: '1.5',
     asOf: now,
-    resources: [resource],
+    resources,
     factories,
     upgrades,
     completedUpgrades: [],

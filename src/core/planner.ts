@@ -122,7 +122,10 @@ function goalReached(state: State) {
 function requirementMet(state: State, requires: any) {
   if (!requires) return true;
   if (requires.type === 'factory') {
-    return (state.factories.find((factory) => factory.id === requires.id)?.owned ?? 0) >= 1;
+    return (
+      (state.factories.find((factory) => factory.id === requires.id)?.owned ?? 0) >=
+      Math.max(1, Number(requires.owned) || 1)
+    );
   }
   if (requires.type === 'upgrade') {
     return state.completedUpgrades?.has(requires.id) === true;

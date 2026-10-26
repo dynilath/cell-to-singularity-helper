@@ -32,6 +32,52 @@ function baseState(overrides = {}) {
 }
 
 describe('planExploration', () => {
+  it('buys a useful upgrade before the first new factory when it speeds up the target', () => {
+    const state = {
+      resources: [{ id: 'r', name: 'r', amount: 0, baseRate: 10 }],
+      factories: [
+        {
+          id: 'producer',
+          label: '产出工厂',
+          price: 1e15,
+          unit: 10,
+          growth: 2,
+          owned: 1,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+        },
+        {
+          id: 'target',
+          label: '新工厂',
+          price: 1000,
+          unit: 100,
+          growth: 2,
+          owned: 0,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+        },
+      ],
+      upgrades: [
+        {
+          id: 'boost',
+          label: '产出升级',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'producer',
+          multiplier: 2,
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set(),
+    };
+    const result = planExploration(state);
+    expect(result.goal).toBe('new-factory');
+    expect(result.steps[0]).toMatchObject({ type: 'upgrade', upgradeId: 'boost' });
+    expect(result.steps.some((step) => step.type === 'buy' && step.factoryId === 'target')).toBe(
+      true,
+    );
+  });
+
   it('buys factories before an upgrade when their payback is faster', () => {
     const result = planExploration(baseState());
     expect(result.complete).toBe(true);

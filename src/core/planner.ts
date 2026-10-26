@@ -1218,6 +1218,13 @@ function searchPlan(start: State, goal: any, upperBound?: PlanResult | null): Pl
       if (target && factoryActionable(state, target)) {
         targets.push({ kind: 'factory', factory: target });
       }
+      // 新工厂目标允许顺路购买已解锁升级：便宜的产出升级可能缩短
+      // 攒钱时间，即使它不是目标工厂的前置条件。
+      for (const upgrade of state.upgrades) {
+        if (upgrade.purchased || upgrade.cost <= 0) continue;
+        if (!upgradeActionable(state, upgrade)) continue;
+        targets.push({ kind: 'upgrade', upgrade });
+      }
     } else {
       for (const upgrade of state.upgrades) {
         if (upgrade.purchased || upgrade.cost <= 0) continue;

@@ -433,6 +433,39 @@ describe('planExploration', () => {
     expect(offline.total).toBeLessThan(20000 / 20);
   });
 
+  it('buys an affordable next factory immediately instead of delaying it into a batch', () => {
+    const state = {
+      resources: [{ id: 'r', name: 'r', amount: 4.94e13, baseRate: 0 }],
+      factories: [
+        {
+          id: 'lung',
+          label: '肺',
+          price: 2.66e13,
+          unit: 1e12,
+          growth: 1.15,
+          owned: 7,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+        },
+      ],
+      upgrades: [
+        {
+          id: 'u',
+          label: '目标升级',
+          cost: 1e16,
+          costResourceId: 'r',
+          targetFactoryId: 'lung',
+          multiplier: 2,
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set(),
+    };
+    const result = planOfflineExploration(state, 2, { adDoubling: true });
+    expect(result.steps[0]).toMatchObject({ label: '肺', t: 0, offline: false });
+    expect(result.steps[1].t).toBeGreaterThan(0);
+  });
+
   it('inserts a factory purchase at a 3-minute checkpoint before a long upgrade wait', () => {
     const state = {
       resources: [{ id: 'r', name: 'r', amount: 2e8, baseRate: 0 }],

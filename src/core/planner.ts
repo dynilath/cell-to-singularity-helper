@@ -449,6 +449,19 @@ function planOfflineCore(input: State, offlineRate = 1, options: OfflineOptions 
     guard += 1;
     const online = planExploration(state);
     if (!online.complete || online.steps.length === 0) break;
+    // 已经买得起的“下一步”必须当场买，不能为了凑离线批次把它推迟到
+    // 12 分钟后再买；先买下可以立即提高离线期间的产出。
+    const nextStep = online.steps[0];
+    if (offlineStepAffordable(state, nextStep)) {
+      const applied = applyOfflineBatch(state, [nextStep], rate, time, blocks);
+      if (!applied) break;
+      steps.push(...applied.steps);
+      time = applied.endTime;
+      blocks += applied.offlineBlocks;
+      onlineTime += applied.onlineTime;
+      offlineTime += applied.offlineTime;
+      continue;
+    }
     // 会改变产出的购买不提前合并：买完一个就重新搜索，避免把
     // 「升级后工厂更划算」的后续顺序锁死在旧计划里。
     const allowMerge = online.steps.every(
@@ -516,6 +529,24 @@ function stepChangesProduction(state: State, step: PlanStep) {
   if (step.type === 'buy') return true;
   const upgrade = state.upgrades.find((item) => item.id === step.upgradeId);
   return !upgrade || upgrade.multiplier !== 1;
+}
+
+function offlineStepAffordable(state: State, step: PlanStep | undefined) {
+  if (!step) return false;
+  if (step.type === 'buy') {
+    const factory = state.factories.find((item) => item.id === step.factoryId);
+    return (
+      !!factory &&
+      factoryActionable(state, factory) &&
+      amountOf(state, factory.costResourceId) >= factory.price - 1e-9
+    );
+  }
+  const upgrade = state.upgrades.find((item) => item.id === step.upgradeId);
+  return (
+    !!upgrade &&
+    upgradeActionable(state, upgrade) &&
+    amountOf(state, upgrade.costResourceId) >= upgrade.cost - 1e-9
+  );
 }
 
 function offlineCandidates(state: State, steps: PlanStep[], rate: number, allowMerge = true) {

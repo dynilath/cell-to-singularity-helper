@@ -129,6 +129,30 @@ const scenarios: Scenario[] = [
       globalAdMultiplier: 1,
     },
   },
+  {
+    name: '前置解锁链',
+    state: oneResource(
+      0,
+      2,
+      [
+        factory('f0', '基础工厂', 100, 2, 1),
+        factory('f1', '进阶工厂', 2000, 10, 0, {
+          requires: { type: 'upgrade', id: 'u1' },
+        }),
+      ],
+      [
+        upgrade('u1', '解锁升级', 500, 'f0', 2, {
+          requires: { type: 'factory', id: 'f0' },
+        }),
+        upgrade('u2', '进阶升级', 5000, 'f1', 2, {
+          requires: { type: 'factory', id: 'f1' },
+        }),
+        upgrade('u3', '最终升级', 50000, 'f0', 2, {
+          requires: { type: 'upgrade', id: 'u2' },
+        }),
+      ],
+    ),
+  },
 ];
 
 function clone(state: SimulationState): SimulationState {
@@ -293,6 +317,115 @@ function heuristic(state: SimulationState) {
   return bound;
 }
 
+interface Gate {
+  key: string;
+  label: string;
+  kind: 'factory' | 'upgrade';
+  id: string;
+  owned: number;
+}
+
+function extractGates(input: SimulationState): Gate[] {
+  const factoryById = new Map(input.factories.map((item) => [item.id, item]));
+  const upgradeById = new Map(input.upgrades.map((item) => [item.id, item]));
+  const requiredFactories = new Map<string, number>();
+  const requiredUpgrades = new Set<string>();
+
+  const addFactory = (id: string, owned: number) => {
+    const factory = factoryById.get(id);
+    if (!factory) return;
+    requiredFactories.set(id, Math.max(requiredFactories.get(id) ?? 1, owned));
+    if (factory.requires?.type === 'upgrade') addUpgrade(factory.requires.id);
+    if (factory.requires?.type === 'factory') {
+      addFactory(factory.requires.id, Math.max(1, factory.requires.owned ?? 1));
+    }
+  };
+
+  const addUpgrade = (id: string) => {
+    if (requiredUpgrades.has(id)) return;
+    const item = upgradeById.get(id);
+    if (!item) return;
+    requiredUpgrades.add(id);
+    addFactory(item.targetFactoryId, 1);
+    if (item.requires?.type === 'upgrade') addUpgrade(item.requires.id);
+    if (item.requires?.type === 'factory') {
+      addFactory(item.requires.id, Math.max(1, item.requires.owned ?? 1));
+    }
+  };
+
+  for (const item of input.upgrades) {
+    if (!item.purchased) addUpgrade(item.id);
+  }
+
+  const dependencies = new Map<string, Set<string>>();
+  const dependents = new Set<string>();
+  const addDependency = (from: string, to: string) => {
+    if (!dependencies.has(from)) dependencies.set(from, new Set());
+    dependencies.get(from).add(to);
+    dependents.add(to);
+  };
+
+  for (const id of requiredUpgrades) {
+    const item = upgradeById.get(id);
+    if (!item) continue;
+    addDependency(`u:${id}`, `f:${item.targetFactoryId}`);
+    if (item.requires?.type === 'upgrade') {
+      addDependency(`u:${id}`, `u:${item.requires.id}`);
+    } else if (item.requires?.type === 'factory') {
+      addDependency(`u:${id}`, `f:${item.requires.id}`);
+    }
+  }
+  for (const [id] of requiredFactories) {
+    const item = factoryById.get(id);
+    if (!item?.requires) continue;
+    if (item.requires.type === 'upgrade') {
+      addDependency(`f:${id}`, `u:${item.requires.id}`);
+    } else {
+      addDependency(`f:${id}`, `f:${item.requires.id}`);
+    }
+  }
+
+  const gates = new Map<string, Gate>();
+  for (const id of requiredUpgrades) {
+    const key = `u:${id}`;
+    if (!dependents.has(key)) continue;
+    const item = upgradeById.get(id);
+    if (!item) continue;
+    gates.set(key, { key, label: item.label, kind: 'upgrade', id, owned: 1 });
+  }
+  for (const [id, owned] of requiredFactories) {
+    const key = `f:${id}`;
+    if (!dependents.has(key)) continue;
+    const item = factoryById.get(id);
+    if (!item) continue;
+    gates.set(key, { key, label: item.label, kind: 'factory', id, owned });
+  }
+
+  const ordered: Gate[] = [];
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const visit = (key: string) => {
+    if (visited.has(key) || visiting.has(key)) return;
+    visiting.add(key);
+    for (const dependency of dependencies.get(key) ?? []) {
+      if (gates.has(dependency)) visit(dependency);
+    }
+    visiting.delete(key);
+    visited.add(key);
+    const gate = gates.get(key);
+    if (gate) ordered.push(gate);
+  };
+  for (const key of [...gates.keys()].sort()) visit(key);
+  return ordered;
+}
+
+function gateSatisfied(state: SimulationState, gate: Gate) {
+  if (gate.kind === 'upgrade') {
+    return state.upgrades.find((item) => item.id === gate.id)?.purchased === true;
+  }
+  return (state.factories.find((item) => item.id === gate.id)?.owned ?? 0) >= gate.owned;
+}
+
 interface Node {
   state: SimulationState;
   time: number;
@@ -304,6 +437,7 @@ function solve(
   input: SimulationState,
   algorithm: 'dijkstra' | 'astar',
   offlineMultiplier?: number,
+  goal: (state: SimulationState) => boolean = goalReached,
 ) {
   const start = clone(input);
   const heap: Node[] = [
@@ -334,12 +468,13 @@ function solve(
 
   while (heap.length > 0 && nodes < maxNodes) {
     const node = pop();
-    if (goalReached(node.state)) {
+    if (goal(node.state)) {
       return {
         total: node.time,
         nodes,
         ms: performance.now() - started,
         path: node.path,
+        state: node.state,
       };
     }
     nodes += 1;
@@ -411,11 +546,45 @@ function solve(
     nodes,
     ms: performance.now() - started,
     path: [],
+    state: start,
   };
 }
 
-function fmtTime(seconds: number) {
-  if (!Number.isFinite(seconds)) return '无解';
+function segmentedSolve(input: SimulationState, offlineMultiplier?: number) {
+  const gates = extractGates(input);
+  let state = clone(input);
+  let total = 0;
+  let nodes = 0;
+  let ms = 0;
+  const path: string[] = [];
+
+  for (const gate of gates) {
+    if (gateSatisfied(state, gate)) continue;
+    const result = solve(
+      state,
+      'dijkstra',
+      offlineMultiplier,
+      (candidate) => gateSatisfied(candidate, gate),
+    );
+    if (!Number.isFinite(result.total)) {
+      return { total, nodes, ms, path, gates, failedAt: gate.label };
+    }
+    state = result.state;
+    total += result.total;
+    nodes += result.nodes;
+    ms += result.ms;
+    path.push(...result.path);
+  }
+
+  const result = solve(state, 'dijkstra', offlineMultiplier);
+  total += result.total;
+  nodes += result.nodes;
+  ms += result.ms;
+  path.push(...result.path);
+  return { total, nodes, ms, path, gates };
+}
+
+function fmtTime(seconds: number) {  if (!Number.isFinite(seconds)) return '无解';
   if (seconds < 120) return `${seconds.toFixed(2)}s`;
   return `${(seconds / 60).toFixed(2)}m`;
 }
@@ -439,36 +608,42 @@ function printTable(rows: string[][]) {
 
 console.log('在线策略');
 printTable([
-  ['场景', '当前', 'Dijkstra', 'A*', '当前差距', '节点/耗时'],
+  ['场景', '当前', 'Dijkstra', 'A*', '分段Dijkstra', '当前差距', 'Dijkstra节点', '分段节点'],
   ...scenarios.map((scenario) => {
     const current = planExploration(scenario.state);
     const dijkstra = solve(scenario.state, 'dijkstra');
     const astar = solve(scenario.state, 'astar');
+    const segmented = segmentedSolve(scenario.state);
     return [
       scenario.name,
       fmtTime(current.total),
       fmtTime(dijkstra.total),
       fmtTime(astar.total),
+      fmtTime(segmented.total),
       fmtGap(current.total, dijkstra.total),
       `${dijkstra.nodes}/${dijkstra.ms.toFixed(1)}ms`,
+      `${segmented.nodes}/${segmented.ms.toFixed(1)}ms (${segmented.gates.length}关)`,
     ];
   }),
 ]);
 
 console.log('\n离线策略（3 分钟块，离线倍率 2，广告 ×2）');
 printTable([
-  ['场景', '当前', 'Dijkstra', 'A*', '当前差距', '节点/耗时'],
+  ['场景', '当前', 'Dijkstra', 'A*', '分段Dijkstra', '当前差距', 'Dijkstra节点', '分段节点'],
   ...scenarios.map((scenario) => {
     const current = planOfflineExploration(scenario.state, 2, { adDoubling: true });
     const dijkstra = solve(scenario.state, 'dijkstra', 4);
     const astar = solve(scenario.state, 'astar', 4);
+    const segmented = segmentedSolve(scenario.state, 4);
     return [
       scenario.name,
       fmtTime(current.total),
       fmtTime(dijkstra.total),
       fmtTime(astar.total),
+      fmtTime(segmented.total),
       fmtGap(current.total, dijkstra.total),
       `${dijkstra.nodes}/${dijkstra.ms.toFixed(1)}ms`,
+      `${segmented.nodes}/${segmented.ms.toFixed(1)}ms (${segmented.gates.length}关)`,
     ];
   }),
 ]);

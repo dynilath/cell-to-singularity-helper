@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>探索活动助手 · Cell to Singularity</title>
+</head>
+<body>
+<div id="banner" class="hidden" role="alert" aria-live="assertive">
+  <span id="banner-text"></span>
+  <button type="button" id="banner-dismiss">知道了</button>
+</div>
+<button type="button" id="drawer-btn">⏰ 提醒 <span id="drawer-count">0</span></button>
+<div id="drawer" class="hidden" aria-label="提醒列表">
+  <div class="drawer-head">
+    <b>提醒列表</b>
+    <button type="button" class="small" id="drawer-close">✕ 收起</button>
+  </div>
+  <div id="drawer-list"></div>
+</div>
+
+<button type="button" id="fab-btn" aria-label="设置与工具" aria-expanded="false" title="设置与工具">⚙️</button>
+<div id="fab-menu" class="hidden" role="menu" aria-label="设置与工具">
+  <div class="fab-head">
+    <b>设置与工具</b>
+  </div>
+  <div class="fab-section">
+    <label for="notation"><b>数字显示格式</b></label>
+    <select id="notation">
+      <option value="short">英文后缀（K/M/B/T）</option>
+      <option value="chinese">中文单位（万/亿/兆）</option>
+      <option value="scientific">科学计数法（1.23e12）</option>
+    </select>
+  </div>
+  <div class="fab-section">
+    <button type="button" class="small primary" id="preset-open" data-menu-close>📥 引入预设…</button>
+    <div class="hint" id="preset-note">尚未引入预设。</div>
+  </div>
+  <div class="fab-section">
+    <button type="button" class="small" id="mh-open" data-menu-close>🧮 倍率助手</button>
+    <div class="hint">根据“等级 → 价格”样本反推每级增长倍率，并可应用到全局倍率。</div>
+  </div>
+</div>
+<main>
+  <header>
+    <h1>🧬 探索活动助手</h1>
+    <p>Cell to Singularity · 多资源、多工厂、多升级：算出先买什么、什么时候点升级</p>
+  </header>
+
+  <section id="resource-section">
+    <div class="section-head">
+      <h2>① 资源<small>每种资源有自己的 emoji、当前数量、基础产出和总计产出</small></h2>
+      <label class="global-ad" title="工厂单台产出按不含全局广告的基准值填写；预设已扣除文档里的 ×4">
+        <span>全局广告倍率</span>
+        <select id="global-ad">
+          <option value="1">×1</option>
+          <option value="2">×2</option>
+          <option value="4">×4</option>
+        </select>
+      </label>
+    </div>
+    <div id="resource-rows"></div>
+    <div class="fac-actions">
+      <button type="button" class="small" id="add-resource">＋ 添加资源</button>
+      <span class="hint">基础产出用于计入没列出的旧工厂</span>
+    </div>
+    <div class="hint" id="cur-est"></div>
+  </section>
+
+  <section id="upgrade-section">
+    <div class="section-head">
+      <h2>② 升级<small>花资源买升级，永久把指定工厂的产出乘以倍率</small></h2>
+      <label class="switch" title="隐藏前置条件未满足的升级">
+        <input type="checkbox" id="hide-locked-upgrades">
+        <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+        <span class="switch-label">隐藏未解锁</span>
+      </label>
+    </div>
+    <div id="upgrade-rows"></div>
+    <div id="upgrade-status" class="action-status" role="status" aria-live="polite"></div>
+    <div class="fac-actions">
+      <button type="button" class="small" id="add-upgrade">＋ 添加升级</button>
+    </div>
+    <div class="hint">购买会扣除资源、把倍率直接乘到目标工厂的单台产出，并删除升级；删除只移除未购买的升级，不扣资源也不应用倍率。按住 Ctrl 再点购买可强制购买：资源不足时会把支付资源清零。新工厂的首台会解锁它的升级。</div>
+  </section>
+
+  <section id="factory-section">
+    <h2>③ 工厂<small>单行填写数量、下一台价格、产出和增长倍率；图标下拉在价格/产出输入右侧</small></h2>
+    <div class="global-row">
+      <label for="global-growth"><b>全局价格增长倍率</b></label>
+      <input id="global-growth" value="1.5" tabindex="-1" lang="en" inputmode="decimal" dir="ltr" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <span class="hint">工厂留空时使用；每买一台价格 × 该倍率</span>
+    </div>
+    <div id="factory-rows"></div>
+    <div id="factory-status" class="action-status" role="status" aria-live="polite"></div>
+    <div class="fac-actions">
+      <button type="button" class="small" id="add-factory">＋ 添加工厂</button>
+    </div>
+    <div class="hint">「买1/5/10个」按当前估算的资源扣款、增加已拥有数量和产出，并更新下一台价格；已拥有数量为 0 的工厂视为新工厂，规划会先点出它。按住 Ctrl 再点买X个可强制购买：资源不足时会把支付资源清零。</div>
+  </section>
+
+  <section id="result-section">
+    <div class="section-head">
+      <h2>④ 最优方案</h2>
+      <label class="plan-strategy">
+        <span>策略</span>
+        <select id="plan-strategy">
+          <option value="online">在线最快</option>
+          <option value="offline">离线攒钱</option>
+        </select>
+      </label>
+    </div>
+    <div class="hint">方案按当前实际资源实时重算：如果提前打开时资源低于原计划当时的预期，等待升级会更久，先补工厂可能变得更划算——这是按新状态重新优化，不是上一次计算算错了。</div>
+    <div id="result-empty" class="hint">填完资源、升级和工厂，这里立即给出结论。</div>
+    <div id="result-body" class="hidden">
+      <div class="strategy" id="strategy"></div>
+      <div class="next-action">
+        <div class="lbl" id="next-lbl"></div>
+        <div class="cnt" id="next-cnt"></div>
+        <div class="clk" id="next-clk"></div>
+      </div>
+      <div class="hint" id="total-line"></div>
+      <div class="row2">
+        <button type="button" class="primary" id="arm-btn">🔔 提醒我（下次行动）</button>
+        <button type="button" class="warn" id="start-steps">▶ 逐步执行此计划</button>
+      </div>
+      <label class="opt-row"><input type="checkbox" id="half-cb"> 离线收入广告翻倍</label>
+      <div class="hint">启用后整段离线收入 ×2（不是只翻后半程）；离线方案和在线方案的提醒等待都会按此缩短，不再额外设半程提醒。</div>
+      <div class="offline-row">
+        <label for="offline-rate"><b>离线收益倍率</b></label>
+        <input id="offline-rate" value="1" tabindex="-1" lang="en" inputmode="decimal" dir="ltr" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-describedby="offline-hint">
+        <span class="hint">实测：总收益 ÷（时间 × 产出），例如 2.1</span>
+      </div>
+      <div class="hint" id="offline-hint">提醒等待时间默认按此倍率提前；选择「离线攒钱」策略时，计划里的离线攒钱段也按该倍率累计。</div>
+      <div class="hint" id="notify-hint"></div>
+      <div class="vol-row">
+        <label for="volume">蜂鸣音量</label>
+        <input type="range" id="volume" min="0" max="100" value="100">
+        <span id="volume-val">100%</span>
+      </div>
+    </div>
+    <div id="result-err" class="err hidden"></div>
+  </section>
+
+  <section id="step-section" class="hidden">
+    <h2>⑤ 逐步执行<small>完成一步点一步，自动提醒下一步</small></h2>
+    <div class="step-banner">
+      <div class="t" id="step-title"></div>
+      <div><span class="cnt" id="step-cnt"></span> <span class="hint" id="step-clk"></span></div>
+    </div>
+    <div class="row2">
+      <button type="button" class="primary" id="complete-step">✓ 完成此步，下一步</button>
+      <button type="button" id="abandon-plan">✕ 放弃计划（改数重算）</button>
+    </div>
+  </section>
+
+  <section id="timeline-section" class="hidden">
+    <h2>⑥ 时间表</h2>
+    <div class="hint table-hint">表格可左右滑动查看完整列</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th class="act">动作</th><th>花费</th><th>资源</th><th>距现在</th><th>时刻</th></tr></thead>
+        <tbody id="timeline"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    倒计时按墙上时钟计算 · 请保持本页开启（可后台）；后台标签页提醒最多延迟约 1 分钟<br>
+    多资源/多升级采用状态搜索找最短路径 · 资源、工厂和升级都可以手动增减
+  </footer>
+</main>
+
+<dialog id="preset-dialog" class="modal" aria-labelledby="preset-title">
+  <div class="modal-head">
+    <b id="preset-title">📥 引入预设</b>
+    <button type="button" class="small" id="preset-close">✕ 关闭</button>
+  </div>
+  <p class="hint modal-hint" id="preset-source"></p>
+  <p class="hint" id="preset-notes"></p>
+  <div class="preset-select-row">
+    <label for="preset-select"><b>选择预设</b></label>
+    <select id="preset-select"></select>
+  </div>
+  <div class="preset-fields">
+    <label><b>声望等级</b><input id="preset-level" type="number" min="1" step="1" value="2" lang="en" inputmode="numeric" dir="ltr"></label>
+    <label><b>徽章加成（%）</b><input id="preset-badge" type="number" min="0" step="5" value="0" lang="en" inputmode="decimal" dir="ltr"></label>
+  </div>
+  <p class="hint">每级声望：收入 ×2、成本 ×4（累乘）。徽章只增加收入，以 5% 为单位。</p>
+  <p class="hint" id="preset-preview"></p>
+  <p class="err hidden" id="preset-error"></p>
+  <p class="hint warn-hint">引入会清空当前资源、工厂、升级、产出状态、计划和提醒，且无法撤销。</p>
+  <div class="row2">
+    <button type="button" class="small" id="preset-cancel">取消</button>
+    <button type="button" class="small primary" id="preset-import">引入并重置</button>
+  </div>
+</dialog>
+
+<dialog id="mh-dialog" class="modal" aria-labelledby="mh-title">
+  <div class="modal-head">
+    <b id="mh-title">🧮 倍率助手</b>
+    <button type="button" class="small" id="mh-close">✕ 关闭</button>
+  </div>
+  <p class="hint modal-hint">不确定增长倍率？填几个等级和当时的价格（如 15 级 3.6M、20 级 13.4M），自动算每级倍率。</p>
+  <div id="mh-rows" class="mh-rows"></div>
+  <div class="row2">
+    <button type="button" class="small" id="mh-add">＋ 加一行</button>
+    <button type="button" class="small primary" id="mh-compute">算倍率</button>
+    <button type="button" class="small primary hidden" id="mh-apply">应用到全局倍率</button>
+  </div>
+  <div class="mh-result" id="mh-result"></div>
+</dialog>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

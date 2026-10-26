@@ -29,6 +29,10 @@ export function createPresetImporter({ document, onImport, getPreset }) {
     return PRESETS.find((item) => item.id === presetSelect.value) ?? PRESETS[0];
   }
 
+  function presetDocLevel(preset = selectedPreset()) {
+    return preset.docLevel ?? PRESET_DOC_LEVEL;
+  }
+
   function syncPresetDetails() {
     const preset = selectedPreset();
     byId(document, 'preset-title').textContent = `📥 引入预设：${preset.title}`;
@@ -65,8 +69,8 @@ export function createPresetImporter({ document, onImport, getPreset }) {
       preview.classList.add('err');
       return;
     }
-    const costFactor = 4 ** (level - PRESET_DOC_LEVEL);
-    const incomeFactor = 2 ** (level - PRESET_DOC_LEVEL) * (1 + badge / 100);
+    const costFactor = 4 ** (level - presetDocLevel());
+    const incomeFactor = 2 ** (level - presetDocLevel()) * (1 + badge / 100);
     preview.classList.remove('err');
     preview.textContent =
       `相对文档基准：收入 ×${formatFactor(incomeFactor)}，成本 ×${formatFactor(costFactor)}` +
@@ -82,7 +86,7 @@ export function createPresetImporter({ document, onImport, getPreset }) {
       presetSelect.value = PRESETS[0].id;
     }
     syncPresetDetails();
-    levelInput.value = String(current?.level ?? PRESET_DOC_LEVEL);
+    levelInput.value = String(current?.level ?? presetDocLevel());
     badgeInput.value = String(current?.badgePercent ?? 0);
     error.textContent = '';
     error.classList.add('hidden');
@@ -127,6 +131,7 @@ export function createPresetImporter({ document, onImport, getPreset }) {
   syncPresetDetails();
   presetSelect.addEventListener('change', () => {
     syncPresetDetails();
+    levelInput.value = String(presetDocLevel());
     updatePreview();
   });
 

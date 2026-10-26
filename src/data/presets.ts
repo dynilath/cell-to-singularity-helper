@@ -53,6 +53,8 @@ interface Preset {
   source: string;
   emoji?: string;
   resources?: PresetResource[];
+  /** 文档对应的声望等级；未填时使用 PRESET_DOC_LEVEL。 */
+  docLevel?: number;
   factoryGrowth?: number;
   notes: string[];
   factories: PresetFactory[];
@@ -111,14 +113,15 @@ export const PRESETS: Preset[] = [
     id: 'anatomy',
     title: '生命解剖学',
     source: 'docs/生命解剖学.md',
+    docLevel: 1,
     resources: [
       { key: 'blue', name: '脱氧血液', emoji: '🔵' },
       { key: 'red', name: '带氧血液', emoji: '🔴' },
     ],
     factoryGrowth: 1.15,
     notes: [
+      '文档数值以声望 1 为基准：成本不额外缩放，收入按声望 ×2/级、徽章再乘 (1 + 徽章%/100)。',
       '文档数值包含全局广告 ×4；导入时先除以 4 存成基准产出，请在页面顶部选择实际广告倍率。',
-      '当前文档未标注声望基准，导入界面默认按声望 2 的倍率换算；请按游戏实际声望调整。',
       '文档数据尚未填写完整，后续可能继续补充。',
       '点击收益升级「血液」「静脉」未纳入工厂产出规划；因此「心脏」的解锁条件暂未建模，其余工厂/升级前置已转成锁定条件。',
       '「内分泌系统」需要至少 5 台才能解锁「骨骼」，该数量条件已保留。',
@@ -186,11 +189,12 @@ function parseUnlock(
 }
 
 /** 生成可直接写入存档的预设状态。 */
-export function buildPresetStore(preset: Preset, { level = PRESET_DOC_LEVEL, badgePercent = 0, now = Date.now() } = {}) {
-  const safeLevel = Number.isInteger(level) && level >= 1 ? level : PRESET_DOC_LEVEL;
+export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now = Date.now() }: { level?: number; badgePercent?: number; now?: number } = {}) {
+  const baseLevel = preset.docLevel ?? PRESET_DOC_LEVEL;
+  const safeLevel = Number.isInteger(level) && (level as number) >= 1 ? (level as number) : baseLevel;
   const safeBadge = Number.isFinite(badgePercent) && badgePercent >= 0 ? badgePercent : 0;
-  const costScale = 4 ** (safeLevel - PRESET_DOC_LEVEL);
-  const incomeScale = 2 ** (safeLevel - PRESET_DOC_LEVEL) * (1 + safeBadge / 100);
+  const costScale = 4 ** (safeLevel - baseLevel);
+  const incomeScale = 2 ** (safeLevel - baseLevel) * (1 + safeBadge / 100);
 
   const resourceDefs: PresetResource[] =
     preset.resources && preset.resources.length > 0

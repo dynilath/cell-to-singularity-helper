@@ -1124,7 +1124,7 @@ describe('resources and notation', () => {
     expect(store.factories).toHaveLength(7);
     expect(store.factories.map((factory) => factory.name)).toContain('心脏');
     expect(store.factories.map((factory) => factory.name)).toContain('皮肤');
-    expect(store.preset).toMatchObject({ id: 'anatomy', level: 2, badgePercent: 0 });
+    expect(store.preset).toMatchObject({ id: 'anatomy', level: 1, badgePercent: 0 });
     expect(context.document.querySelectorAll('#resource-rows .res-row')).toHaveLength(2);
     expect(
       [...context.document.querySelectorAll('#resource-rows .res-emoji')].map(

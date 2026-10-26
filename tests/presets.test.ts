@@ -13,7 +13,7 @@ function findFactory(store, name) {
 
 describe('life anatomy preset', () => {
   it('imports two resources and cross-resource factories', () => {
-    const store = buildPresetStore(anatomyPreset, { level: 2, badgePercent: 0 });
+    const store = buildPresetStore(anatomyPreset, { level: 1, badgePercent: 0 });
     expect(store.resources.map((resource) => resource.emoji)).toEqual(['🔵', '🔴']);
     expect(
       store.resources.every((resource) => RESOURCE_EMOJIS.includes(resource.emoji)),
@@ -46,7 +46,7 @@ describe('life anatomy preset', () => {
   });
 
   it('keeps the five-endocrine requirement and omits click-only upgrades', () => {
-    const store = buildPresetStore(anatomyPreset, { level: 2, badgePercent: 0 });
+    const store = buildPresetStore(anatomyPreset, { level: 1, badgePercent: 0 });
     const endocrine = findFactory(store, '内分泌系统');
     const bone = findFactory(store, '骨骼');
     expect(bone.requires).toEqual({
@@ -65,6 +65,13 @@ describe('life anatomy preset', () => {
       targetFactoryId: findFactory(store, '肌肉').id,
     });
     expect(findFactory(store, '心脏').requires).toBeNull();
+  });
+
+  it('scales anatomy from its reputation-1 document baseline', () => {
+    const level1 = buildPresetStore(anatomyPreset, { level: 1, badgePercent: 0 });
+    const level2 = buildPresetStore(anatomyPreset, { level: 2, badgePercent: 0 });
+    expect(findFactory(level1, '心脏')).toMatchObject({ price: '100', unit: '1' });
+    expect(findFactory(level2, '心脏')).toMatchObject({ price: '400', unit: '2' });
   });
 });
 

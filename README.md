@@ -142,6 +142,7 @@ npm install
 npm run dev        # 开发服务器
 npm run typecheck  # tsc --noEmit
 npm test           # Vitest
+npm run bench      # 规划算法对比基准
 npm run lint       # ESLint
 npm run check      # lint + typecheck + test + build + dist 冒烟
 ```
@@ -173,8 +174,29 @@ src/
     multiplierHelper.ts  # 倍率助手
   styles.css
 tests/                   # Vitest + jsdom（TypeScript 测试）
+bench/planner-bench.ts   # 当前规划器 vs Dijkstra/A* 小状态基准
 scripts/verify-dist.mjs  # 构建产物冒烟
 ```
+
+## 算法基准
+
+`npm run bench` 会在几个小状态上对比：
+
+- 当前生产规划器；
+- 事件图 Dijkstra（小状态参考，带支配剪枝和节点上限）；
+- 一个实验性 A*（简单启发式，不保证最优）。
+
+当前结果里，简单状态通常已经最优，但更复杂的工厂投资/多资源场景存在明显差距：
+
+| 场景 | 当前 vs Dijkstra（在线） | 当前 vs Dijkstra（离线） |
+|---|---:|---:|
+| 简单升级 | 0% | 0% |
+| 先补工厂再升级 | 0% | +43.9% |
+| 两台工厂/两个升级 | +3.7% | +54.1% |
+| 肺：已买得起第一台 | +81.1% | +64.8% |
+| 多资源工厂 | +15.3% | +63.1% |
+
+Dijkstra 在“多资源工厂”场景需要约 1.7 万节点/0.8 秒，直接替换生产规划器会太慢。基准的用途是量化启发式损失，并给后续“小状态精确搜索 + 大状态启发式”的混合方案提供对照。
 
 ## 已知限制
 

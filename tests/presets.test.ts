@@ -15,6 +15,7 @@ describe('life anatomy preset', () => {
   it('imports two resources and cross-resource factories', () => {
     const store = buildPresetStore(anatomyPreset, { level: 1, badgePercent: 0 });
     expect(store.resources.map((resource) => resource.emoji)).toEqual(['🔵', '🔴']);
+    expect(store.factories.every((factory) => factory.growth === '1.1505')).toBe(true);
     expect(
       store.resources.every((resource) => RESOURCE_EMOJIS.includes(resource.emoji)),
     ).toBe(true);
@@ -89,7 +90,7 @@ describe('fear preset', () => {
     expect(findFactory(store, '诡异生物')).toMatchObject({ price: '100K', unit: '100' });
     expect(findFactory(store, '深不可测的存在')).toMatchObject({ price: '200M', unit: '5.00K' });
     expect(store.factories.every((factory) => factory.owned === '0')).toBe(true);
-    expect(store.factories.every((factory) => factory.growth === '1.15')).toBe(true);
+    expect(store.factories.every((factory) => factory.growth === '1.1505')).toBe(true);
     expect(store.upgrades).toHaveLength(24);
     const dog = store.upgrades.find((upgrade) => upgrade.name === '狗头人');
     expect(dog).toMatchObject({ cost: '1.60K', multiplier: '2' });

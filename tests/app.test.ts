@@ -1100,7 +1100,7 @@ describe('resources and notation', () => {
       name: '深不可测的存在',
       price: '50.0M',
       unit: '2.75K',
-      growth: '1.15',
+      growth: '1.1505',
       owned: '0',
     });
     expect(store.upgrades).toHaveLength(24);

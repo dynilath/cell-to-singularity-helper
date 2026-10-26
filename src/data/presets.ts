@@ -153,6 +153,7 @@ export const PRESETS: Preset[] = [
       { name: '骨头', cost: 1.5e10, costResource: 'blue', unlock: '骨骼', effect: { kind: 'factory', target: '骨骼', multiplier: 6 } },
       { name: '软骨', cost: 2e14, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 41 } },
       { name: '骨髓', cost: 3e11, costResource: 'blue', unlock: '骨头', effect: { kind: 'factory', target: '骨骼', multiplier: 11 } },
+      { name: '肌腱', cost: 8e14, costResource: 'blue', unlock: '肌肉', effect: { kind: 'factory', target: '肌肉', multiplier: 31 } },
       { name: '骨骼肌肉', cost: 2e12, costResource: 'blue', unlock: '肌肉', effect: { kind: 'factory', target: '肌肉', multiplier: 26 } },
       { name: '支气管', cost: 8e12, costResource: 'blue', unlock: '肺', effect: { kind: 'factory', target: '肺', multiplier: 3 } },
       { name: '耳朵', cost: 7.5e13, costResource: 'blue', unlock: '支气管', effect: { kind: 'factory', target: '大脑', multiplier: 3.5 } },

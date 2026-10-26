@@ -58,6 +58,12 @@ describe('life anatomy preset', () => {
     expect(store.upgrades.some((upgrade) => upgrade.name === '静脉')).toBe(false);
     expect(store.upgrades.filter((upgrade) => upgrade.name === '软骨')).toHaveLength(1);
     expect(store.upgrades.some((upgrade) => upgrade.name === '软骨（肌肉）')).toBe(false);
+    const tendon = store.upgrades.find((upgrade) => upgrade.name === '肌腱');
+    expect(tendon).toMatchObject({
+      cost: '800T',
+      multiplier: '31',
+      targetFactoryId: findFactory(store, '肌肉').id,
+    });
     expect(findFactory(store, '心脏').requires).toBeNull();
   });
 });

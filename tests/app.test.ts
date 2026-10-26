@@ -352,7 +352,7 @@ describe('v6 boot', () => {
           {
             id: 'u1',
             name: '升级1',
-            cost: '100000',
+            cost: '1000000',
             costResourceId: 'r1',
             targetFactoryId: 'f1',
             multiplier: '2',

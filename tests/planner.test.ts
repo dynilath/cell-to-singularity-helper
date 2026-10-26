@@ -267,7 +267,7 @@ describe('planExploration', () => {
     expect(offline.total).toBeCloseTo(100 / 11, 6);
   });
 
-  it('merges offline waits when merging does not delay the plan', () => {
+  it('does not use offline for a wait shorter than one 3-minute chunk', () => {
     const state = {
       resources: [{ id: 'r', name: 'r', amount: 0, baseRate: 10 }],
       factories: [
@@ -307,13 +307,14 @@ describe('planExploration', () => {
     const online = planExploration(state);
     const offline = planOfflineExploration(state, 2.1);
     expect(offline.steps).toHaveLength(2);
-    expect(offline.offlineBlocks).toBe(1);
-    expect(offline.steps[0].t).toBeCloseTo(offline.steps[1].t, 6);
-    expect(offline.total).toBeCloseTo(60.000001, 3);
-    expect(offline.total).toBeLessThan(online.total);
+    expect(offline.offlineBlocks).toBe(0);
+    expect(offline.steps[0].offline).toBe(false);
+    expect(offline.steps[1].offline).toBe(false);
+    expect(offline.total).toBeCloseTo(100, 6);
+    expect(offline.total).toBeCloseTo(online.total, 6);
   });
 
-  it('merges equal-time multi-resource batches', () => {
+  it('merges equal-time multi-resource batches without pretending they are offline', () => {
     const state = {
       resources: [
         { id: 'a', name: 'A', amount: 0, baseRate: 0 },
@@ -365,9 +366,10 @@ describe('planExploration', () => {
     };
     const offline = planOfflineExploration(state, 2.1);
     expect(offline.steps).toHaveLength(2);
-    expect(offline.offlineBlocks).toBe(1);
-    expect(offline.steps[0].t).toBeCloseTo(offline.steps[1].t, 6);
-    expect(offline.total).toBeCloseTo(60.000001, 3);
+    expect(offline.offlineBlocks).toBe(0);
+    expect(offline.steps[0].offline).toBe(false);
+    expect(offline.steps[1].offline).toBe(false);
+    expect(offline.total).toBeCloseTo(100, 6);
   });
 
   it('splits multi-resource offline waits when an early upgrade boosts the other resource', () => {
@@ -422,11 +424,12 @@ describe('planExploration', () => {
     };
     const offline = planOfflineExploration(state, 2.1);
     expect(offline.steps).toHaveLength(2);
-    expect(offline.offlineBlocks).toBe(2);
-    expect(offline.total).toBeCloseTo(
-      60.000001 + (20000 - 1260) / (20 * 2.1),
-      3,
-    );
+    expect(offline.offlineBlocks).toBe(1);
+    expect(offline.steps[0].offline).toBe(false);
+    expect(offline.steps[0].t).toBeCloseTo(100, 6);
+    expect(offline.steps[1].offline).toBe(true);
+    expect(offline.steps[1].offlineWait).toBeCloseTo(540, 6);
+    expect(offline.total).toBeCloseTo(640, 6);
     expect(offline.total).toBeLessThan(20000 / 20);
   });
 

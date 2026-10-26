@@ -24,6 +24,8 @@ type OfflineOptions = { adDoubling?: boolean };
 export const MAX_ACTIONS = 400;
 /** 一次离线必须超过 1 分钟才会触发离线收益。 */
 const MIN_OFFLINE_BLOCK_SECONDS = 60;
+/** 离线等待只按完整的 3 分钟块计算；精确等待改走在线。 */
+const OFFLINE_CHUNK_SECONDS = 180;
 /** 手算经验值：以 3 分钟为检查点（常见 12/15/17 分钟档位）。 */
 const OFFLINE_CHECKPOINT_SECONDS = 180;
 const MAX_OFFLINE_CHECKPOINTS = 3;
@@ -602,10 +604,11 @@ function chooseWaitMode(state: State, costs: any, offlineRate: number) {
   if (onlineWait <= 1e-9) {
     return { wait: 0, offline: false, onlineTime: 0, offlineTime: 0, rates };
   }
-  // 离线收益只在离线超过 1 分钟时触发；不够就等满 1 分钟，或直接在线等待。
+  // 离线等待只按完整 3 分钟块取整；放不下一个完整块时改走在线等待，
+  // 差额部分不会以“精确等待”的形式冒充离线时长。
   const offlineWait = Math.max(
-    rawOfflineWait,
     MIN_OFFLINE_BLOCK_SECONDS + 1e-6,
+    Math.ceil(rawOfflineWait / OFFLINE_CHUNK_SECONDS) * OFFLINE_CHUNK_SECONDS,
   );
   if (offlineWait < onlineWait - 1e-9) {
     return {

@@ -1,4 +1,4 @@
-import { byId } from './dom.js';
+import { byId } from './dom.ts';
 
 /**
  * 右下角悬浮球菜单：数字显示格式、引入预设等顶级入口。

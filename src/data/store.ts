@@ -9,8 +9,8 @@ import {
   createEmptyUpgrade,
   normalizeReminder,
   normalizeStore,
-} from './schema.js';
-import { normalizeNotation } from '../core/numbers.js';
+} from './schema.ts';
+import { normalizeNotation } from '../core/numbers.ts';
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

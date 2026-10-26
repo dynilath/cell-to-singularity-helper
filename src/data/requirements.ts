@@ -1,4 +1,4 @@
-import { parseNum } from '../core/numbers.js';
+import { parseNum } from '../core/numbers.ts';
 
 /** 前置条件：{ type: 'factory' | 'upgrade', id }。 */
 

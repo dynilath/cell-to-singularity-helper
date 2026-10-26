@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planExploration, planOfflineExploration } from '../src/core/planner.js';
+import { planExploration, planOfflineExploration } from '../src/core/planner.ts';
 
 function baseState(overrides = {}) {
   return {

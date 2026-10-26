@@ -1,5 +1,5 @@
-import { fmtClock, fmtDur } from '../core/numbers.js';
-import { byId, clear } from './dom.js';
+import { fmtClock, fmtDur } from '../core/numbers.ts';
+import { byId, clear } from './dom.ts';
 
 /**
  * 「⏰ 提醒」抽屉：单一规划提醒的暂停、恢复、重新计时、取消。

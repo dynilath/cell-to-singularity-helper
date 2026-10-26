@@ -1,11 +1,11 @@
-import { fmtNum, parseNum } from '../core/numbers.js';
+import { fmtNum, parseNum } from '../core/numbers.ts';
 import {
   RESOURCE_EMOJIS,
   createEmptyFactory,
   createEmptyResource,
   createEmptyUpgrade,
-} from '../data/schema.js';
-import { factoryLockReason, upgradeLockReason } from '../data/requirements.js';
+} from '../data/schema.ts';
+import { factoryLockReason, upgradeLockReason } from '../data/requirements.ts';
 
 const NUMBER_ATTRS = {
   lang: 'en',
@@ -72,7 +72,7 @@ export function createEditor({
   onQuickBuy,
   onUpgradeBuy,
   hideLockedUpgrades = false,
-  onHideLockedChange = () => {},
+  onHideLockedChange = (_hide: boolean) => {},
 }) {
   const resourceHost = document.getElementById('resource-rows');
   const factoryHost = document.getElementById('factory-rows');

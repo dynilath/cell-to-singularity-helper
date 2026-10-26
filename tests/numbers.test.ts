@@ -6,7 +6,7 @@ import {
   getNotationMode,
   parseNum,
   setNotationMode,
-} from '../src/core/numbers.js';
+} from '../src/core/numbers.ts';
 
 describe('parseNum', () => {
   it('parses supported suffixes', () => {

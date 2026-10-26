@@ -1,5 +1,5 @@
 import './styles.css';
-import { createApp } from './app.js';
+import { createApp } from './app.ts';
 
 let app = null;
 

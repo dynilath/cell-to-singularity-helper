@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { PRESETS, buildPresetStore } from '../src/data/presets.js';
+import { PRESETS, buildPresetStore } from '../src/data/presets.ts';
 import {
   factoryLockReason,
   upgradeLockReason,
-} from '../src/data/requirements.js';
+} from '../src/data/requirements.ts';
 
 function presetGroup() {
   return buildPresetStore(PRESETS[0], { level: 2, badgePercent: 0 });

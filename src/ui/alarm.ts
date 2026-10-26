@@ -1,4 +1,4 @@
-import { byId, hide, show } from './dom.js';
+import { byId, hide, show } from './dom.ts';
 
 const FLASH_INTERVAL_MS = 800;
 const REPEAT_BEEP_MS = 8000;

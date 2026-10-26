@@ -1,6 +1,6 @@
-import { estimateGrowth } from '../core/growth.js';
-import { fmtNum, parseNum } from '../core/numbers.js';
-import { applyNumberInputHints, byId, enableBackdropClose, hide, show } from './dom.js';
+import { estimateGrowth } from '../core/growth.ts';
+import { fmtNum, parseNum } from '../core/numbers.ts';
+import { applyNumberInputHints, byId, enableBackdropClose, hide, show } from './dom.ts';
 
 /**
  * 倍率助手（弹窗）：填等级和价格，算每级增长倍率并一键应用到全局。

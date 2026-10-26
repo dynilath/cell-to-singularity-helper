@@ -1,5 +1,5 @@
-import { PRESETS, PRESET_DOC_LEVEL } from '../data/presets.js';
-import { byId, enableBackdropClose } from './dom.js';
+import { PRESETS, PRESET_DOC_LEVEL } from '../data/presets.ts';
+import { byId, enableBackdropClose } from './dom.ts';
 
 /**
  * 预设导入弹窗：声望等级 + 徽章加成（5% 档位）。

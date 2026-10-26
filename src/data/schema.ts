@@ -17,6 +17,8 @@
  * 会变成三个资源；v2 的单槽位变成一个资源。
  */
 
+import type { Reminder } from '../types.ts';
+
 export const STORAGE_KEY = 'cts_data_v6';
 
 export const LEGACY_STORAGE = Object.freeze({
@@ -141,7 +143,7 @@ export function normalizeReminder(raw, now = Date.now()) {
   const duration = toNumber(raw.durMs);
   const fired = raw.fired === true;
   const paused = !fired && raw.paused === true;
-  const reminder = {
+  const reminder: Reminder = {
     kind: raw.kind === 'half' ? 'half' : 'full',
     title: cleanResourceText(raw.title),
     body: cleanResourceText(raw.body),

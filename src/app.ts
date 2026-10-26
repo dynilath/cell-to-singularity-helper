@@ -1,9 +1,9 @@
-import { fmtDur, fmtNum, setNotationMode, parseNum } from './core/numbers.js';
-import { planExploration, planOfflineExploration } from './core/planner.js';
-import { buildState, factoryQuote } from './core/exploration.js';
-import { cleanResourceText, PLAN_VERSION, resourceLabel } from './data/schema.js';
-import { factoryLockReason, upgradeLockReason } from './data/requirements.js';
-import { buildPresetStore } from './data/presets.js';
+import { fmtDur, fmtNum, setNotationMode, parseNum } from './core/numbers.ts';
+import { planExploration, planOfflineExploration } from './core/planner.ts';
+import { buildState, factoryQuote } from './core/exploration.ts';
+import { cleanResourceText, PLAN_VERSION, resourceLabel } from './data/schema.ts';
+import { factoryLockReason, upgradeLockReason } from './data/requirements.ts';
+import { buildPresetStore } from './data/presets.ts';
 import {
   loadSettings,
   loadStore,
@@ -15,7 +15,7 @@ import {
   savePlanStrategy,
   saveStore,
   saveVolume,
-} from './data/store.js';
+} from './data/store.ts';
 import {
   isDue,
   isRunning,
@@ -25,16 +25,16 @@ import {
   resumeReminder,
   retimeReminder,
   reminderEndTime,
-} from './services/reminders.js';
-import { createAlarm } from './ui/alarm.js';
-import { createDrawer } from './ui/drawer.js';
-import { createEditor } from './ui/editor.js';
-import { createFabMenu } from './ui/fabMenu.js';
-import { createMultiplierHelper } from './ui/multiplierHelper.js';
-import { createPlanView } from './ui/planView.js';
-import { createPresetImporter } from './ui/presetImporter.js';
-import { createStepView } from './ui/stepView.js';
-import { byId } from './ui/dom.js';
+} from './services/reminders.ts';
+import { createAlarm } from './ui/alarm.ts';
+import { createDrawer } from './ui/drawer.ts';
+import { createEditor } from './ui/editor.ts';
+import { createFabMenu } from './ui/fabMenu.ts';
+import { createMultiplierHelper } from './ui/multiplierHelper.ts';
+import { createPlanView } from './ui/planView.ts';
+import { createPresetImporter } from './ui/presetImporter.ts';
+import { createStepView } from './ui/stepView.ts';
+import { byId } from './ui/dom.ts';
 
 const RECOMPUTE_DELAY_MS = 300;
 const TICK_MS = 500;

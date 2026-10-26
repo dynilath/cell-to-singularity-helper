@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { createApp } from '../src/app.js';
-import { PLAN_VERSION, RESOURCE_EMOJIS, SETTING_KEYS, STORAGE_KEY } from '../src/data/schema.js';
+import { createApp } from '../src/app.ts';
+import { PLAN_VERSION, RESOURCE_EMOJIS, SETTING_KEYS, STORAGE_KEY } from '../src/data/schema.ts';
 
 const HTML = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
 const OPEN_TIME = new Date('2026-10-20T12:00:00+08:00').getTime();

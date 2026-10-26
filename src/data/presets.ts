@@ -7,7 +7,7 @@
  *   成本倍率 = 4^(level-2)
  */
 
-import { fmtNum } from '../core/numbers.js';
+import { fmtNum } from '../core/numbers.ts';
 
 export const PRESET_DOC_LEVEL = 2;
 /** 文档产出按全局广告 ×4 记录；存档保存不含广告倍率的基准产出。 */

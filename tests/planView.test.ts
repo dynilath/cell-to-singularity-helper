@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planSummary } from '../src/ui/planView.js';
+import { planSummary } from '../src/ui/planView.ts';
 
 function step(type, label, extra = {}) {
   return { type, label, ...extra };

@@ -1,22 +1,27 @@
-import { parseNum } from './numbers.js';
+import { parseNum } from './numbers.ts';
+import type {
+  BuildStateOptions,
+  BuildStateResult,
+  FactoryState,
+  ResourceState,
+  SimulationState,
+  UpgradeState,
+} from '../types.ts';
 
 /**
  * 把界面里的字符串状态转成纯数字状态，并做基本校验。
  * 资源数量会按离线收益倍率推算到“现在”，供规划和快速结算使用。
- *
- * @param {any} group
- * @param {{ now?: number, offlineRate?: number, globalAdMultiplier?: number }} [options]
  */
-export function buildState(group, options = {}) {
+export function buildState(group: any, options: BuildStateOptions = {}): BuildStateResult {
   const now = options.now ?? Date.now();
   const offlineRate = options.offlineRate ?? 1;
   const globalAdMultiplier =
-    Number.isFinite(options.globalAdMultiplier) && options.globalAdMultiplier > 0
-      ? options.globalAdMultiplier
+    Number.isFinite(options.globalAdMultiplier) && (options.globalAdMultiplier ?? 0) > 0
+      ? (options.globalAdMultiplier as number)
       : 1;
-  const errors = [];
+  const errors: string[] = [];
 
-  const resources = group.resources.map((resource, index) => {
+  const resources: ResourceState[] = group.resources.map((resource, index) => {
     const amount = resource.amount.trim() === '' ? 0 : parseNum(resource.amount);
     const baseRate = resource.baseRate.trim() === '' ? 0 : parseNum(resource.baseRate);
     if (!Number.isFinite(amount) || amount < 0) {
@@ -35,9 +40,9 @@ export function buildState(group, options = {}) {
 
   const resourceIds = new Set(resources.map((resource) => resource.id));
   const globalGrowth = parseNum(group.globalGrowth);
-  const invalidFactoryIds = new Set();
+  const invalidFactoryIds = new Set<string>();
 
-  const factories = group.factories
+  const factories: FactoryState[] = group.factories
     .map((factory, index) => {
       const price = parseNum(factory.price);
       const unit = parseNum(factory.unit);
@@ -72,11 +77,11 @@ export function buildState(group, options = {}) {
         requires: factory.requires ?? null,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean) as FactoryState[];
 
   const factoryIds = new Set(factories.map((factory) => factory.id));
-  const ignoredUpgradeIds = new Set();
-  const upgrades = group.upgrades
+  const ignoredUpgradeIds = new Set<string>();
+  const upgrades: UpgradeState[] = group.upgrades
     .map((upgrade, index) => {
       if (!factoryIds.has(upgrade.targetFactoryId)) {
         ignoredUpgradeIds.add(upgrade.id);
@@ -112,14 +117,19 @@ export function buildState(group, options = {}) {
         requires: upgrade.requires ?? null,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean) as UpgradeState[];
 
-  const state = { resources, factories, upgrades, globalAdMultiplier };
-  state.completedUpgrades = new Set(
-    Array.isArray(group.completedUpgrades) ? group.completedUpgrades : [],
-  );
-  state.invalidFactoryIds = [...invalidFactoryIds];
-  state.ignoredUpgradeIds = [...ignoredUpgradeIds];
+  const state: SimulationState = {
+    resources,
+    factories,
+    upgrades,
+    globalAdMultiplier,
+    completedUpgrades: new Set(
+      Array.isArray(group.completedUpgrades) ? group.completedUpgrades : [],
+    ),
+    invalidFactoryIds: [...invalidFactoryIds],
+    ignoredUpgradeIds: [...ignoredUpgradeIds],
+  };
   const rates = computeRates(state);
   const multipliers = multipliersFor(state);
   for (const factory of state.factories) {
@@ -157,21 +167,28 @@ export function buildState(group, options = {}) {
   };
 }
 
-export function multipliersFor(state) {
-  const multipliers = new Map(state.factories.map((factory) => [factory.id, 1]));
+export function multipliersFor(state: SimulationState): Map<string, number> {
+  const multipliers = new Map<string, number>(
+    state.factories.map((factory) => [factory.id, 1]),
+  );
   for (const upgrade of state.upgrades) {
     if (!upgrade.purchased || upgrade.multiplier <= 0) continue;
     if (!multipliers.has(upgrade.targetFactoryId)) continue;
     multipliers.set(
       upgrade.targetFactoryId,
-      multipliers.get(upgrade.targetFactoryId) * upgrade.multiplier,
+      (multipliers.get(upgrade.targetFactoryId) ?? 1) * upgrade.multiplier,
     );
   }
   return multipliers;
 }
 
-export function computeRates(state, multipliers = multipliersFor(state)) {
-  const rates = new Map(state.resources.map((resource) => [resource.id, resource.baseRate]));
+export function computeRates(
+  state: SimulationState,
+  multipliers: Map<string, number> = multipliersFor(state),
+): Map<string, number> {
+  const rates = new Map<string, number>(
+    state.resources.map((resource) => [resource.id, resource.baseRate]),
+  );
   const globalMultiplier = state.globalAdMultiplier ?? 1;
   for (const factory of state.factories) {
     if (factory.owned <= 0 || factory.unit <= 0) continue;
@@ -188,7 +205,11 @@ export function computeRates(state, multipliers = multipliersFor(state)) {
   return rates;
 }
 
-export function factoryContribution(state, factoryId, multipliers = multipliersFor(state)) {
+export function factoryContribution(
+  state: SimulationState,
+  factoryId: string,
+  multipliers: Map<string, number> = multipliersFor(state),
+): number {
   const factory = state.factories.find((item) => item.id === factoryId);
   if (!factory || factory.owned <= 0 || factory.unit <= 0) return 0;
   return (
@@ -204,7 +225,7 @@ export function factoryContribution(state, factoryId, multipliers = multipliersF
  * @param {{ price: number, growth: number }} factory
  * @param {number} count
  */
-export function factoryQuote(factory, count) {
+export function factoryQuote(factory: { price: number; growth: number }, count: number) {
   if (
     !factory ||
     !Number.isFinite(factory.price) ||

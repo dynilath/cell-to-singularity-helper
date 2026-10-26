@@ -7,7 +7,7 @@ import {
   cleanResourceText,
   createEmptyStore,
   normalizeStore,
-} from '../src/data/schema.js';
+} from '../src/data/schema.ts';
 import {
   loadSettings,
   loadStore,
@@ -19,7 +19,7 @@ import {
   savePlanStrategy,
   saveStore,
   saveVolume,
-} from '../src/data/store.js';
+} from '../src/data/store.ts';
 
 function createStorage(initial = {}) {
   const map = new Map(Object.entries(initial));

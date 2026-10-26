@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePurchase } from '../src/core/purchase.js';
+import { calculatePurchase } from '../src/core/purchase.ts';
 
 describe('calculatePurchase', () => {
   it('settles a single purchase', () => {

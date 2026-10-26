@@ -9,7 +9,7 @@ import {
   reminderEndTime,
   resumeReminder,
   retimeReminder,
-} from '../src/services/reminders.js';
+} from '../src/services/reminders.ts';
 
 const NOW = 1_800_000_000_000;
 

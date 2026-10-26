@@ -126,10 +126,11 @@
 
 ```bash
 npm install
-npm run dev      # 开发服务器
-npm test         # Vitest
-npm run lint     # ESLint
-npm run check    # lint + test + build + dist 冒烟
+npm run dev        # 开发服务器
+npm run typecheck  # tsc --noEmit
+npm test           # Vitest
+npm run lint       # ESLint
+npm run check      # lint + typecheck + test + build + dist 冒烟
 ```
 
 `npm run build` 生成单文件 `dist/index.html`。根目录的 `index.html` 是 Vite 入口，不能直接双击打开。
@@ -138,26 +139,27 @@ npm run check    # lint + test + build + dist 冒烟
 
 ```text
 src/
-  app.js                 # 编排、规划、购买、提醒
+  types.ts               # 共享的存档/状态/计划类型
+  app.ts                 # 编排、规划、购买、提醒
   core/
-    planner.js           # 多资源/多升级事件推进规划器
-    exploration.js       # 字符串状态 → 数字状态、倍率、报价
-    numbers.js           # 数字解析/格式化
-    growth.js            # 倍率助手算法
-    purchase.js          # 连续购买总价
+    planner.ts           # 多资源/多升级事件推进规划器
+    exploration.ts       # 字符串状态 → 数字状态、倍率、报价
+    numbers.ts           # 数字解析/格式化
+    growth.ts            # 倍率助手算法
+    purchase.ts          # 连续购买总价
   data/
-    schema.js            # v6 数据结构、资源 emoji、规范化
-    store.js             # 存档/设置/旧版迁移
-  services/reminders.js  # 提醒纯函数
+    schema.ts            # v6 数据结构、资源 emoji、规范化
+    store.ts             # 存档/设置/旧版迁移
+  services/reminders.ts  # 提醒纯函数
   ui/
-    editor.js            # 资源/工厂/升级编辑器
-    planView.js          # 结果与时间表
-    stepView.js          # 逐步执行
-    drawer.js            # 提醒抽屉
-    alarm.js             # 横幅/蜂鸣/通知
-    multiplierHelper.js  # 倍率助手
+    editor.ts            # 资源/工厂/升级编辑器
+    planView.ts          # 结果与时间表
+    stepView.ts          # 逐步执行
+    drawer.ts            # 提醒抽屉
+    alarm.ts             # 横幅/蜂鸣/通知
+    multiplierHelper.ts  # 倍率助手
   styles.css
-tests/                   # Vitest + jsdom
+tests/                   # Vitest + jsdom（TypeScript 测试）
 scripts/verify-dist.mjs  # 构建产物冒烟
 ```
 

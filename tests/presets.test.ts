@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { PRESETS, PRESET_DOC_LEVEL, buildPresetStore } from '../src/data/presets.js';
-import { buildState } from '../src/core/exploration.js';
-import { planExploration } from '../src/core/planner.js';
+import { PRESETS, PRESET_DOC_LEVEL, buildPresetStore } from '../src/data/presets.ts';
+import { buildState } from '../src/core/exploration.ts';
+import { planExploration } from '../src/core/planner.ts';
 
 const preset = PRESETS[0];
 

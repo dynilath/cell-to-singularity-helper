@@ -10,6 +10,17 @@
  * 原贪心路径作为搜索上界和搜索预算耗尽时的兜底。
  */
 
+import type {
+  FactoryState,
+  PlanResult,
+  PlanStep,
+  SimulationState,
+  UpgradeState,
+} from '../types.ts';
+
+type State = SimulationState & { time?: number };
+type OfflineOptions = { adDoubling?: boolean };
+
 export const MAX_ACTIONS = 400;
 /** 一次离线必须超过 1 分钟才会触发离线收益。 */
 const MIN_OFFLINE_BLOCK_SECONDS = 60;
@@ -31,21 +42,28 @@ const MAX_FACTORIES_PER_CHECKPOINT = 2;
  * @typedef {{ resources: ResourceState[], factories: FactoryState[], upgrades: UpgradeState[] }} ExplorationState
  */
 
-function multipliersFor(state) {
-  const multipliers = new Map(state.factories.map((factory) => [factory.id, 1]));
+function multipliersFor(state: State): Map<string, number> {
+  const multipliers = new Map<string, number>(
+    state.factories.map((factory) => [factory.id, 1]),
+  );
   for (const upgrade of state.upgrades) {
     if (!upgrade.purchased || upgrade.multiplier <= 0) continue;
     if (!multipliers.has(upgrade.targetFactoryId)) continue;
     multipliers.set(
       upgrade.targetFactoryId,
-      multipliers.get(upgrade.targetFactoryId) * upgrade.multiplier,
+      (multipliers.get(upgrade.targetFactoryId) ?? 1) * upgrade.multiplier,
     );
   }
   return multipliers;
 }
 
-function computeRates(state, multipliers = multipliersFor(state)) {
-  const rates = new Map(state.resources.map((resource) => [resource.id, resource.baseRate]));
+function computeRates(
+  state: State,
+  multipliers: Map<string, number> = multipliersFor(state),
+): Map<string, number> {
+  const rates = new Map<string, number>(
+    state.resources.map((resource) => [resource.id, resource.baseRate]),
+  );
   const globalMultiplier = state.globalAdMultiplier ?? 1;
   for (const factory of state.factories) {
     if (factory.owned <= 0 || factory.unit <= 0) continue;
@@ -62,27 +80,27 @@ function computeRates(state, multipliers = multipliersFor(state)) {
   return rates;
 }
 
-function contributionOf(factory, multipliers) {
+function contributionOf(factory: FactoryState, multipliers: Map<string, number>) {
   if (factory.owned <= 0 || factory.unit <= 0) return 0;
   return factory.owned * factory.unit * (multipliers.get(factory.id) ?? 1);
 }
 
-function amountOf(state, resourceId) {
+function amountOf(state: State, resourceId: string) {
   return state.resources.find((resource) => resource.id === resourceId)?.amount ?? 0;
 }
 
-function resourceNameOf(state, resourceId) {
+function resourceNameOf(state: State, resourceId: string) {
   return state.resources.find((item) => item.id === resourceId)?.emoji ?? '资源';
 }
 
-function wait(state, rates, seconds) {
+function wait(state: State, rates: Map<string, number>, seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) return;
   for (const resource of state.resources) {
     resource.amount += (rates.get(resource.id) ?? 0) * seconds;
   }
 }
 
-function currentGoal(state) {
+function currentGoal(state: State) {
   const target = state.factories.find(
     (factory) => factory.owned < 1 && factoryActionable(state, factory),
   );
@@ -93,7 +111,7 @@ function currentGoal(state) {
   };
 }
 
-function goalReached(state) {
+function goalReached(state: State) {
   const target = state.factories.find(
     (factory) => factory.owned < 1 && factoryActionable(state, factory),
   );
@@ -101,7 +119,7 @@ function goalReached(state) {
   return state.upgrades.every((upgrade) => upgrade.purchased);
 }
 
-function requirementMet(state, requires) {
+function requirementMet(state: State, requires: any) {
   if (!requires) return true;
   if (requires.type === 'factory') {
     return (state.factories.find((factory) => factory.id === requires.id)?.owned ?? 0) >= 1;
@@ -112,18 +130,18 @@ function requirementMet(state, requires) {
   return true;
 }
 
-function factoryActionable(state, factory) {
+function factoryActionable(state: State, factory: FactoryState) {
   if (factory.owned > 0) return true;
   return requirementMet(state, factory.requires);
 }
 
-function upgradeActionable(state, upgrade) {
+function upgradeActionable(state: State, upgrade: UpgradeState) {
   const target = state.factories.find((factory) => factory.id === upgrade.targetFactoryId);
   if (!target || target.owned < 1) return false;
   return requirementMet(state, upgrade.requires);
 }
 
-function affordableUpgrade(state) {
+function affordableUpgrade(state: State) {
   const multipliers = multipliersFor(state);
   const candidates = state.upgrades
     .filter(
@@ -146,7 +164,7 @@ function affordableUpgrade(state) {
   return candidates[0].upgrade;
 }
 
-function nextUpgradeTime(state, rates, resourceId = null) {
+function nextUpgradeTime(state: State, rates: Map<string, number>, resourceId: string | null = null) {
   let best = Number.POSITIVE_INFINITY;
   for (const upgrade of state.upgrades) {
     if (upgrade.purchased || upgrade.cost <= 0) continue;
@@ -161,13 +179,13 @@ function nextUpgradeTime(state, rates, resourceId = null) {
   return best;
 }
 
-function buyFactory(state, factory, price) {
+function buyFactory(state: State, factory: FactoryState, price: number) {
   state.resources.find((resource) => resource.id === factory.costResourceId).amount -= price;
   factory.owned += 1;
   factory.price = price * factory.growth;
 }
 
-function buyUpgrade(state, upgrade) {
+function buyUpgrade(state: State, upgrade: UpgradeState) {
   state.resources.find((resource) => resource.id === upgrade.costResourceId).amount -=
     upgrade.cost;
   upgrade.purchased = true;
@@ -175,7 +193,7 @@ function buyUpgrade(state, upgrade) {
   state.completedUpgrades.add(upgrade.id);
 }
 
-function pushBuyStep(steps, state, factory, price, elapsed) {
+function pushBuyStep(steps: PlanStep[], state: State, factory: FactoryState, price: number, elapsed: number) {
   steps.push({
     type: 'buy',
     factoryId: factory.id,
@@ -189,7 +207,7 @@ function pushBuyStep(steps, state, factory, price, elapsed) {
   buyFactory(state, factory, price);
 }
 
-function pushUpgradeStep(steps, state, upgrade, elapsed) {
+function pushUpgradeStep(steps: PlanStep[], state: State, upgrade: UpgradeState, elapsed: number) {
   steps.push({
     type: 'upgrade',
     upgradeId: upgrade.id,
@@ -202,7 +220,7 @@ function pushUpgradeStep(steps, state, upgrade, elapsed) {
   buyUpgrade(state, upgrade);
 }
 
-function usefulFactory(state, rates, neededResources) {
+function usefulFactory(state: State, rates: Map<string, number>, neededResources: Set<string>) {
   const multipliers = multipliersFor(state);
   let best = null;
   for (const factory of state.factories) {
@@ -218,7 +236,7 @@ function usefulFactory(state, rates, neededResources) {
   return best;
 }
 
-function nextUsefulFactoryTime(state, rates, neededResources) {
+function nextUsefulFactoryTime(state: State, rates: Map<string, number>, neededResources: Set<string>) {
   let best = Number.POSITIVE_INFINITY;
   for (const factory of state.factories) {
     if (!neededResources.has(factory.outputResourceId)) continue;
@@ -229,7 +247,7 @@ function nextUsefulFactoryTime(state, rates, neededResources) {
   return best;
 }
 
-function timeToFactory(state, rates, factory) {
+function timeToFactory(state: State, rates: Map<string, number>, factory: FactoryState) {
   if (factory.unit <= 0 || factory.price <= 0) return Number.POSITIVE_INFINITY;
   const rate = rates.get(factory.costResourceId) ?? 0;
   if (rate <= 0) return Number.POSITIVE_INFINITY;
@@ -244,7 +262,7 @@ function timeToFactory(state, rates, factory) {
  *   goal: 'new-factory' | 'upgrades', goalLabel: string, total: number,
  * }}
  */
-export function planExploration(input) {
+export function planExploration(input: State): PlanResult {
   const start = searchClone(input);
   const goal = searchGoal(start);
   const greedy = greedyExploration(input);
@@ -262,7 +280,7 @@ export function planExploration(input) {
   return {
     steps: result.steps,
     complete: result.complete,
-    goal: goal.type,
+    goal: goal.type as PlanResult['goal'],
     goalLabel:
       goal.type === 'new-factory'
         ? `点出第一个新工厂：${goal.target.label}`
@@ -283,7 +301,7 @@ export function planExploration(input) {
  * @param {number} offlineRate
  * @param {{ adDoubling?: boolean }} [options]
  */
-export function planOfflineExploration(input, offlineRate = 1, options = {}) {
+export function planOfflineExploration(input: State, offlineRate = 1, options: OfflineOptions = {}): PlanResult {
   const base = planOfflineCore(input, offlineRate, options);
   if (!base.complete || base.steps.length === 0) return base;
   return tryCheckpointInsertion(input, base, offlineRate, options) ?? base;
@@ -293,7 +311,7 @@ export function planOfflineExploration(input, offlineRate = 1, options = {}) {
  * 3 分钟检查点：在等待第一个动作的途中，如果资源已经能买工厂，
  * 尝试“返回买工厂 → 重新规划剩余部分”，让同一资源路径上的策略稳定。
  */
-function tryCheckpointInsertion(input, base, offlineRate, options) {
+function tryCheckpointInsertion(input: State, base: PlanResult, offlineRate: number, options: OfflineOptions) {
   // 长计划反复重算代价太高；检查点只用于中小规模状态。
   if (base.steps.length > 40) return null;
   if (input.upgrades.length + input.factories.length > 12) return null;
@@ -340,7 +358,7 @@ function tryCheckpointInsertion(input, base, offlineRate, options) {
       next.resources.find((item) => item.id === target.costResourceId).amount -= price;
       target.owned += 1;
       target.price = price * target.growth;
-      const checkpointStep = {
+      const checkpointStep: PlanStep = {
         type: 'buy',
         factoryId: target.id,
         label: target.label,
@@ -382,14 +400,14 @@ function tryCheckpointInsertion(input, base, offlineRate, options) {
   return improved ? best : null;
 }
 
-function planOfflineCore(input, offlineRate = 1, options = {}) {
+function planOfflineCore(input: State, offlineRate = 1, options: OfflineOptions = {}): PlanResult {
   const base = planExploration(input);
   const adDoubling = options.adDoubling === true;
   // 离线收入广告是「整段离线收入 ×2」，不是半程才翻倍。
   const rate =
     (Number.isFinite(offlineRate) && offlineRate > 0 ? offlineRate : 1) *
     (adDoubling ? 2 : 1);
-  const baseResult = {
+  const baseResult: PlanResult = {
     ...base,
     strategy: 'offline',
     offlineBlocks: 0,
@@ -482,20 +500,20 @@ function planOfflineCore(input, offlineRate = 1, options = {}) {
   };
 }
 
-function offlineGoalReached(state, goal, targetId) {
+function offlineGoalReached(state: State, goal: PlanResult['goal'], targetId?: string) {
   if (goal === 'new-factory') {
     return (state.factories.find((factory) => factory.id === targetId)?.owned ?? 0) >= 1;
   }
   return state.upgrades.every((upgrade) => upgrade.purchased);
 }
 
-function stepChangesProduction(state, step) {
+function stepChangesProduction(state: State, step: PlanStep) {
   if (step.type === 'buy') return true;
   const upgrade = state.upgrades.find((item) => item.id === step.upgradeId);
   return !upgrade || upgrade.multiplier !== 1;
 }
 
-function offlineCandidates(state, steps, rate, allowMerge = true) {
+function offlineCandidates(state: State, steps: PlanStep[], rate: number, allowMerge = true) {
   const baseSizes = [1, 2, 3, 5, 8, 13, steps.length];
   // 升级后紧接的一串工厂购买，可以尝试并入升级前的同一次离线攒钱。
   let upgradeFactoryRun = 1;
@@ -542,7 +560,7 @@ function offlineCandidates(state, steps, rate, allowMerge = true) {
   return candidates;
 }
 
-function chooseOfflineCandidate(candidates, onlineTotal) {
+function chooseOfflineCandidate(candidates: any[], onlineTotal: number) {
   const bestTotal = candidates.reduce(
     (best, candidate) => Math.min(best, candidate.total),
     Number.POSITIVE_INFINITY,
@@ -563,7 +581,7 @@ function chooseOfflineCandidate(candidates, onlineTotal) {
   return pool[0];
 }
 
-function chooseWaitMode(state, costs, offlineRate) {
+function chooseWaitMode(state: State, costs: any, offlineRate: number) {
   const rates = searchRates(state);
   let onlineWait = 0;
   let rawOfflineWait = 0;
@@ -605,7 +623,7 @@ function chooseWaitMode(state, costs, offlineRate) {
 }
 
 /** 应用一段离线购买，返回带绝对时间的步骤。 */
-function applyOfflineBatch(state, batch, offlineRate, startTime, blockCount) {
+function applyOfflineBatch(state: State, batch: any[], offlineRate: number, startTime: number, blockCount: number) {
   const costs = offlineBatchCosts(state, batch);
   if (!costs) return null;
   const decision = chooseWaitMode(state, costs, offlineRate);
@@ -676,7 +694,7 @@ function applyOfflineBatch(state, batch, offlineRate, startTime, blockCount) {
   };
 }
 
-function offlineClone(input) {
+function offlineClone(input: State): State {
   return {
     resources: input.resources.map((resource) => ({ ...resource })),
     factories: input.factories.map((factory) => ({ ...factory })),
@@ -687,7 +705,7 @@ function offlineClone(input) {
 }
 
 /** 只推进价格/倍率，不改资源，用于计算一段动作的总价。 */
-function offlineBatchCosts(state, batch) {
+function offlineBatchCosts(state: State, batch: any[]) {
   const shadow = offlineClone(state);
   const costs = new Map();
   for (const step of batch) {
@@ -720,7 +738,7 @@ function offlineBatchCosts(state, batch) {
   return costs;
 }
 
-function simulateOfflineBatches(input, steps, batchSize, offlineRate) {
+function simulateOfflineBatches(input: State, steps: PlanStep[], batchSize: number, offlineRate: number) {
   const state = offlineClone(input);
   const out = [];
   let time = 0;
@@ -802,7 +820,7 @@ function simulateOfflineBatches(input, steps, batchSize, offlineRate) {
 }
 
 /** 原贪心路径：作为搜索上界和搜索失败时的兜底。 */
-function greedyExploration(input) {
+function greedyExploration(input: State): PlanResult {
   const state = {
     resources: input.resources.map((resource) => ({ ...resource })),
     factories: input.factories.map((factory) => ({ ...factory })),
@@ -921,7 +939,7 @@ function greedyExploration(input) {
   return {
     steps,
     complete,
-    goal: initialGoal.type,
+    goal: initialGoal.type as PlanResult['goal'],
     goalLabel,
     total: elapsed,
   };
@@ -935,7 +953,7 @@ function greedyExploration(input) {
 const MAX_SEARCH_NODES = 30000;
 const MAX_FRONTIER_PER_CONFIG = 48;
 
-function searchClone(input) {
+function searchClone(input: State): State {
   return {
     resources: input.resources.map((resource) => ({ ...resource })),
     factories: input.factories.map((factory) => ({ ...factory })),
@@ -946,7 +964,7 @@ function searchClone(input) {
   };
 }
 
-function searchGoal(state) {
+function searchGoal(state: State) {
   const target = state.factories.find(
     (factory) => factory.owned < 1 && factoryActionable(state, factory),
   );
@@ -957,14 +975,14 @@ function searchGoal(state) {
   };
 }
 
-function searchReached(state, goal) {
+function searchReached(state: State, goal: any) {
   if (goal.type === 'new-factory') {
     return (state.factories.find((factory) => factory.id === goal.targetId)?.owned ?? 0) >= 1;
   }
   return state.upgrades.every((upgrade) => upgrade.purchased);
 }
 
-function searchRates(state) {
+function searchRates(state: State): Map<string, number> {
   const rates = new Map(state.resources.map((resource) => [resource.id, resource.baseRate]));
   const globalMultiplier = state.globalAdMultiplier ?? 1;
   for (const factory of state.factories) {
@@ -978,11 +996,11 @@ function searchRates(state) {
   return rates;
 }
 
-function searchAmount(state, resourceId) {
+function searchAmount(state: State, resourceId: string) {
   return state.resources.find((resource) => resource.id === resourceId)?.amount ?? 0;
 }
 
-function searchHeuristic(state, goal) {
+function searchHeuristic(state: State, goal: any) {
   const rates = searchRates(state);
   const remaining = new Map();
   if (goal.type === 'new-factory') {
@@ -1025,17 +1043,17 @@ function searchHeuristic(state, goal) {
   return lowerBound;
 }
 
-function searchConfigKey(state) {
+function searchConfigKey(state: State) {
   return `${state.factories.map((factory) => `${factory.id}:${factory.owned}`).join('|')}#${state.upgrades
     .map((upgrade) => (upgrade.purchased ? 1 : 0))
     .join('')}`;
 }
 
-function searchAmounts(state) {
+function searchAmounts(state: State) {
   return state.resources.map((resource) => resource.amount);
 }
 
-function searchDominates(frontier, state) {
+function searchDominates(frontier: any[], state: State) {
   const amounts = searchAmounts(state);
   for (const entry of frontier) {
     if (
@@ -1048,7 +1066,7 @@ function searchDominates(frontier, state) {
   return false;
 }
 
-function searchAddFrontier(frontier, state) {
+function searchAddFrontier(frontier: any[], state: State) {
   const amounts = searchAmounts(state);
   const next = frontier.filter(
     (entry) =>
@@ -1109,8 +1127,16 @@ function createSearchHeap() {
  * A* 搜索。返回开销最小的动作序列；搜索预算耗尽时返回已知上界。
  * 每个动作 = 等到目标可买，然后立即购买。任意购买序列都能这样表达。
  */
-function searchPlan(start, goal, upperBound) {
-  if (searchReached(start, goal)) return { steps: [], complete: true, total: 0 };
+function searchPlan(start: State, goal: any, upperBound?: PlanResult | null): PlanResult {
+  if (searchReached(start, goal)) {
+    return {
+      steps: [],
+      complete: true,
+      goal: 'upgrades',
+      goalLabel: '',
+      total: 0,
+    };
+  }
 
   let bestSteps = upperBound?.steps ?? [];
   let bestTotal = upperBound?.complete ? upperBound.total : Number.POSITIVE_INFINITY;
@@ -1186,11 +1212,11 @@ function searchPlan(start, goal, upperBound) {
       const time = node.time + wait;
       if (time >= bestTotal - 1e-9) continue;
 
-      const next = {
+      const next: State = {
         resources: state.resources.map((resource) => ({ ...resource })),
         factories: state.factories.map((factory) => ({ ...factory })),
         upgrades: state.upgrades.map((upgrade) => ({ ...upgrade })),
-        completedUpgrades: new Set(state.completedUpgrades ?? []),
+        completedUpgrades: new Set<string>(state.completedUpgrades ?? []),
         globalAdMultiplier: state.globalAdMultiplier ?? 1,
         time,
       };
@@ -1198,7 +1224,7 @@ function searchPlan(start, goal, upperBound) {
         resource.amount += (rates.get(resource.id) ?? 0) * wait;
       }
 
-      let step;
+      let step: PlanStep;
       if (isFactory) {
         const factory = next.factories.find((item) => item.id === target.factory.id);
         if (!factory) continue;
@@ -1261,5 +1287,7 @@ function searchPlan(start, goal, upperBound) {
     steps: bestSteps,
     complete: Number.isFinite(bestTotal),
     total: Number.isFinite(bestTotal) ? bestTotal : 0,
+    goal: 'upgrades',
+    goalLabel: '',
   };
 }

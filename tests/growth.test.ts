@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimateGrowth } from '../src/core/growth.js';
+import { estimateGrowth } from '../src/core/growth.ts';
 
 describe('estimateGrowth', () => {
   it('computes the growth rate between two samples', () => {

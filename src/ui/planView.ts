@@ -1,6 +1,6 @@
-import { fmtClock, fmtDur, fmtNum } from '../core/numbers.js';
-import { cleanResourceText } from '../data/schema.js';
-import { byId } from './dom.js';
+import { fmtClock, fmtDur, fmtNum } from '../core/numbers.ts';
+import { cleanResourceText } from '../data/schema.ts';
+import { byId } from './dom.ts';
 
 function actionText(step) {
   return step.type === 'upgrade' ? `买 ${step.label}` : `买 ${step.label} · 第${step.nth}台`;

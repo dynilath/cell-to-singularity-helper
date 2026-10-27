@@ -157,6 +157,7 @@ export function createEditor({
       });
 
       const amount = numberInput(document, resource.amount, '当前数量');
+      amount.dataset.resourceAmountFor = resource.id;
       amount.addEventListener('input', () => {
         resource.amount = amount.value;
         signalChange();
@@ -338,6 +339,7 @@ export function createEditor({
       });
 
       const price = numberInput(document, factory.price, '下一台价格');
+      price.dataset.factoryPriceFor = factory.id;
       price.addEventListener('input', () => {
         factory.price = price.value;
         signalChange();
@@ -521,7 +523,6 @@ export function createEditor({
 
   function updateRates(state) {
     lastState = state;
-
     for (const input of resourceHost.querySelectorAll('[data-total-rate-for]')) {
       const resource = state.resources.find((item) => item.id === input.dataset.totalRateFor);
       if (!resource) continue;
@@ -603,6 +604,23 @@ export function createEditor({
       const contribution = factory.owned * factory.unit * multiplier;
       node.textContent = `当前贡献 ${fmtNum(contribution)} ${resource.emoji}/秒`;
     }
+  }
+
+  function syncPurchase(factoryId: string, resourceId: string) {
+    const group = getGroup();
+    const rawResource = group.resources.find((item) => item.id === resourceId);
+    if (rawResource) {
+      const amount = resourceHost.querySelector(
+        `[data-resource-amount-for="${resourceId}"]`,
+      );
+      if (amount) amount.value = rawResource.amount;
+    }
+    const rawFactory = group.factories.find((item) => item.id === factoryId);
+    if (!rawFactory) return;
+    const owned = factoryHost.querySelector(`[data-factory-owned-for="${factoryId}"]`);
+    if (owned) owned.value = rawFactory.owned;
+    const price = factoryHost.querySelector(`[data-factory-price-for="${factoryId}"]`);
+    if (price) price.value = rawFactory.price;
   }
 
   function applyNotation() {
@@ -751,6 +769,7 @@ export function createEditor({
   return {
     render: renderAll,
     sync: renderAll,
+    syncPurchase,
     updateRates,
     applyNotation,
     setStatus,

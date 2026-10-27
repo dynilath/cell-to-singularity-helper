@@ -564,11 +564,16 @@ describe('manual purchases', () => {
         upgrades: [],
       }),
     );
+    const row = context.document.querySelector('#factory-rows .fac-row');
     click(context, '#factory-rows .fac-buy[data-count="1"]');
     const store = savedStore(context);
     expect(store.resources[0].amount).toBe('900');
     expect(store.factories[0].owned).toBe('1');
     expect(store.factories[0].price).toBe('200');
+    expect(context.document.querySelector('#factory-rows .fac-row')).toBe(row);
+    expect(context.document.querySelector('[data-factory-owned-for="f1"]').value).toBe('1');
+    expect(context.document.querySelector('[data-factory-price-for="f1"]').value).toBe('200');
+    expect(context.document.querySelector('[data-resource-amount-for="r1"]').value).toBe('900');
     expect(context.document.getElementById('factory-status').textContent).toContain('已结算');
   });
 

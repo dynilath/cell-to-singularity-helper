@@ -1,5 +1,4 @@
 import { fmtDur, fmtNum, setNotationMode, parseNum } from './core/numbers.ts';
-import { planExploration, planOfflineExploration } from './core/planner.ts';
 import { buildState, factoryQuote } from './core/exploration.ts';
 import { cleanResourceText, PLAN_VERSION, resourceLabel } from './data/schema.ts';
 import { factoryLockReason, upgradeLockReason } from './data/requirements.ts';
@@ -26,6 +25,8 @@ import {
   retimeReminder,
   reminderEndTime,
 } from './services/reminders.ts';
+import { createPlannerClient } from './services/plannerClient.ts';
+import type { PlanStrategy } from './types.ts';
 import { createAlarm } from './ui/alarm.ts';
 import { createDrawer } from './ui/drawer.ts';
 import { createEditor } from './ui/editor.ts';
@@ -48,11 +49,13 @@ export function createApp({ document, window }) {
   let plan = store.plan;
   let stepMode = Boolean(plan && plan.stepIndex < plan.steps.length);
   let offlineRate = settings.offlineRate;
-  let planStrategy = settings.planStrategy;
+  let planStrategy: PlanStrategy =
+    settings.planStrategy === 'offline' ? 'offline' : 'online';
   let adDoubling = settings.half;
   let globalAdMultiplier = settings.globalAdMultiplier;
   let recomputeTimer = null;
   let pendingRecomputeAt = null;
+  let planGeneration = 0;
   let tickTimer = null;
   let disposed = false;
   let notationSelect = null;
@@ -62,6 +65,7 @@ export function createApp({ document, window }) {
 
   const alarm = createAlarm({ document, window });
   alarm.setVolume(settings.volume);
+  const planner = createPlannerClient();
 
   const planView = createPlanView({ document });
   const stepView = createStepView({ document });
@@ -199,6 +203,7 @@ export function createApp({ document, window }) {
 
   function handleDataChange() {
     if (disposed) return;
+    planGeneration += 1;
     const snapshotAt = Date.now();
     store.asOf = snapshotAt;
     pendingRecomputeAt = snapshotAt;
@@ -215,17 +220,24 @@ export function createApp({ document, window }) {
     }, RECOMPUTE_DELAY_MS);
   }
 
+  function cancelPendingRecompute() {
+    planGeneration += 1;
+    if (recomputeTimer) clearTimeout(recomputeTimer);
+    recomputeTimer = null;
+    pendingRecomputeAt = null;
+  }
+
   function flushPendingRecompute() {
     if (!recomputeTimer) return false;
     const snapshotAt = pendingRecomputeAt;
     pendingRecomputeAt = null;
     clearTimeout(recomputeTimer);
     recomputeTimer = null;
-    recompute({ userEdit: false, snapshotAt });
+    recompute({ userEdit: false, snapshotAt, synchronous: true });
     return true;
   }
 
-  function recompute({ userEdit = true, snapshotAt = null } = {}) {
+  function recompute({ userEdit = true, snapshotAt = null, synchronous = false } = {}) {
     if (disposed) return;
     if (snapshotAt === null && pendingRecomputeAt !== null) {
       snapshotAt = pendingRecomputeAt;
@@ -279,40 +291,58 @@ export function createApp({ document, window }) {
     editor.updateRates(built.state);
     updateCurEstimate(built);
 
-    const result =
-      planStrategy === 'offline'
-        ? planOfflineExploration(built.state, offlineRate, { adDoubling })
-        : planExploration(built.state);
-    const nextPlan = {
-      steps: result.steps,
-      anchor: Date.now(),
-      stepIndex: 0,
-      goal: result.goal,
-      goalLabel: result.goalLabel,
-      complete: result.complete,
-      total: result.total,
-      generatedAt: Date.now(),
-      strategy: result.strategy ?? 'online',
-      offlineBlocks: result.offlineBlocks ?? 0,
-      onlineTime: result.onlineTime ?? result.total,
-      offlineTime: result.offlineTime ?? 0,
-      baselineTotal: result.baselineTotal ?? result.total,
-      adDoubled: result.adDoubled === true,
-      version: PLAN_VERSION,
+    const generation = ++planGeneration;
+    const applyResult = (result) => {
+      if (disposed || generation !== planGeneration) return;
+      const nextPlan = {
+        steps: result.steps,
+        anchor: Date.now(),
+        stepIndex: 0,
+        goal: result.goal,
+        goalLabel: result.goalLabel,
+        complete: result.complete,
+        total: result.total,
+        generatedAt: Date.now(),
+        strategy: result.strategy ?? 'online',
+        offlineBlocks: result.offlineBlocks ?? 0,
+        onlineTime: result.onlineTime ?? result.total,
+        offlineTime: result.offlineTime ?? 0,
+        baselineTotal: result.baselineTotal ?? result.total,
+        adDoubled: result.adDoubled === true,
+        version: PLAN_VERSION,
+      };
+
+      plan = nextPlan;
+      stepMode = false;
+      store.plan = nextPlan;
+      stepView.hide();
+      persistStore();
+      if (result.steps.length === 0 && !result.complete) {
+        planView.showError('还没有可执行的路径：检查工厂价格/产出、资源数量和升级价格。');
+      } else {
+        planView.render({ plan, now: Date.now() });
+      }
+      syncArmButton();
+      refreshDrawer();
     };
 
-    plan = nextPlan;
-    stepMode = false;
-    store.plan = nextPlan;
-    stepView.hide();
-    persistStore();
-    if (result.steps.length === 0 && !result.complete) {
-      planView.showError('还没有可执行的路径：检查工厂价格/产出、资源数量和升级价格。');
+    const showPlanError = (cause) => {
+      if (disposed || generation !== planGeneration) return;
+      plan = null;
+      store.plan = null;
+      planView.showError(`规划失败：${cause instanceof Error ? cause.message : String(cause)}`);
+      syncArmButton();
+      persistStore();
+    };
+
+    const computation = synchronous
+      ? planner.computeSync(built.state, planStrategy, offlineRate, adDoubling)
+      : planner.compute(built.state, planStrategy, offlineRate, adDoubling);
+    if (computation instanceof Promise) {
+      computation.then(applyResult).catch(showPlanError);
     } else {
-      planView.render({ plan, now: Date.now() });
+      applyResult(computation);
     }
-    syncArmButton();
-    refreshDrawer();
   }
 
   function materialize(built) {
@@ -337,7 +367,7 @@ export function createApp({ document, window }) {
   }
 
   function quickBuyFactory(factoryId, count, force = false) {
-    flushPendingRecompute();
+    cancelPendingRecompute();
     const built = buildState(store, { now: Date.now(), offlineRate, globalAdMultiplier });
     if (!built.ok) {
       setFactoryStatus(built.errors[0] ?? '工厂数据还不完整', true);
@@ -397,7 +427,7 @@ export function createApp({ document, window }) {
     rawFactory.price = fmtNum(quote.nextPrice);
     store.asOf = now;
 
-    editor.render();
+    editor.syncPurchase(factoryId, rawFactory.costResourceId);
     if (continuesPlan) {
       plan.steps.splice(plan.stepIndex, 1);
       if (plan.stepIndex >= plan.steps.length) {
@@ -996,8 +1026,10 @@ export function createApp({ document, window }) {
 
   function dispose() {
     disposed = true;
+    planGeneration += 1;
     if (recomputeTimer) clearTimeout(recomputeTimer);
     if (tickTimer) window.clearInterval(tickTimer);
+    planner.dispose();
     alarm.dispose();
   }
 

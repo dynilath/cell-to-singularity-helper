@@ -474,13 +474,8 @@ export function planStateSpace(
       if (!factoryActionable(node.state, factory)) continue;
       if (factory.owned >= (maxOwned.get(factory.id) ?? factory.owned)) continue;
       const isTarget = targetFactory?.id === factory.id;
-      if (
-        !isTarget &&
-        targetResourceId &&
-        factory.outputResourceId !== targetResourceId
-      ) {
-        continue;
-      }
+      // 成本资源和产出资源可以不同；不要再按“产出 == 目标资源”过滤。
+      // 只排除相对于当前产出可忽略的工厂，目标工厂永远保留。
       if (!isTarget && factory.unit * (node.state.globalAdMultiplier ?? 1) < targetRate * 0.001) {
         continue;
       }

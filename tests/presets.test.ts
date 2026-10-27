@@ -40,10 +40,13 @@ describe('life anatomy preset', () => {
     });
     expect(lung).toMatchObject({
       price: '10.0T',
-      unit: '505M',
+      unit: '508M',
       costResourceId: blue.id,
       outputResourceId: red.id,
     });
+    expect(store.factories.map((factory) => factory.name)).toEqual(
+      expect.arrayContaining(['胃', '肾脏', '肝']),
+    );
   });
 
   it('keeps the five-endocrine requirement and omits click-only upgrades', () => {
@@ -80,6 +83,38 @@ describe('life anatomy preset', () => {
       targetFactoryId: findFactory(store, '内分泌系统').id,
       multiplier: '7.50B',
     });
+    const stomach = findFactory(store, '胃');
+    const digestion = store.upgrades.find((upgrade) => upgrade.name === '消化');
+    const mouth = store.upgrades.find((upgrade) => upgrade.name === '嘴巴');
+    expect(stomach.requires).toEqual({ type: 'upgrade', id: digestion.id });
+    expect(digestion.requires).toEqual({ type: 'upgrade', id: mouth.id });
+    expect(mouth).toMatchObject({
+      targetFactoryId: findFactory(store, '大脑').id,
+      multiplier: '5.00M',
+      requires: {
+        type: 'upgrade',
+        id: store.upgrades.find((upgrade) => upgrade.name === '表皮层').id,
+      },
+    });
+    expect(
+      store.upgrades.map((upgrade) => upgrade.name),
+    ).toEqual(
+      expect.arrayContaining([
+        '关节',
+        '嘴巴',
+        '消化',
+        '平滑肌',
+        '小肠',
+        '左心房',
+        '大肠',
+        '左心室',
+        '输尿管',
+        '膀胱',
+        '主动脉',
+        '胆囊',
+        '胰腺',
+      ]),
+    );
   });
 
   it('scales anatomy from its reputation-1 document baseline', () => {

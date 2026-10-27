@@ -415,6 +415,7 @@ export function planStateSpace(
   const heap = createHeap();
   const frontiers = new Map<string, { time: number; amounts: number[] }[]>();
   const heuristic = targetHeuristic(start, target, offlineMultiplier);
+  let bestTarget: SearchNode | null = null;
   heap.push({
     state: start,
     time: 0,
@@ -429,20 +430,10 @@ export function planStateSpace(
   while (heap.size > 0 && expanded < MAX_NODES) {
     const node = heap.pop();
     expanded += 1;
+    if (bestTarget && node.time >= bestTarget.time - 1e-9) continue;
     if (targetReached(node.state, target)) {
-      return {
-        steps: node.steps,
-        complete: false,
-        goal: 'unlock',
-        goalLabel: targetLabel(target),
-        total: node.time,
-        strategy: 'search',
-        offlineBlocks: node.offlineBlocks,
-        onlineTime: node.onlineTime,
-        offlineTime: node.offlineTime,
-        baselineTotal: node.time,
-        adDoubled: options.adDoubling === true,
-      };
+      if (!bestTarget || node.time < bestTarget.time - 1e-9) bestTarget = node;
+      continue;
     }
 
     const key = configKey(node.state);
@@ -462,21 +453,33 @@ export function planStateSpace(
     const targetResourceId = targetUpgrade
       ? targetUpgrade.costResourceId
       : targetFactory?.costResourceId;
-    const targetRate = targetResourceId ? (rates.get(targetResourceId) ?? 0) : 0;
-    const relevantFactoryIds = new Set<string>();
-    // 只收“能产出目标花费资源”的工厂，以及目标工厂本身；
-    // 不要求工厂产出和成本是同一资源，目标工厂永远保留。
+    const directFactoryIds = new Set<string>();
+    if (targetFactory) directFactoryIds.add(targetFactory.id);
     for (const factory of node.state.factories) {
       if (!factoryActionable(node.state, factory)) continue;
-      const isTarget = targetFactory?.id === factory.id;
-      if (!isTarget && factory.outputResourceId !== targetResourceId) continue;
-      if (
-        !isTarget &&
-        factory.unit * (node.state.globalAdMultiplier ?? 1) < targetRate * 0.001
-      ) {
-        continue;
+      if (factory.outputResourceId === targetResourceId) directFactoryIds.add(factory.id);
+    }
+    // 目标资源的生产工厂可能消耗另一种资源；继续向下收集生产那种资源的工厂。
+    // 这些“间接工厂”也能让目标工厂更早买得起。
+    const relevantFactoryIds = new Set(directFactoryIds);
+    const neededResources = new Set<string>();
+    if (targetResourceId) neededResources.add(targetResourceId);
+    for (let depth = 0; depth < 4; depth += 1) {
+      let changed = false;
+      for (const factory of node.state.factories) {
+        if (!factoryActionable(node.state, factory)) continue;
+        if (
+          neededResources.has(factory.outputResourceId) &&
+          !relevantFactoryIds.has(factory.id)
+        ) {
+          relevantFactoryIds.add(factory.id);
+          changed = true;
+        }
+        if (relevantFactoryIds.has(factory.id)) {
+          neededResources.add(factory.costResourceId);
+        }
       }
-      relevantFactoryIds.add(factory.id);
+      if (!changed) break;
     }
     const items: {
       kind: TargetKind;
@@ -496,14 +499,13 @@ export function planStateSpace(
         resourceId: factory.costResourceId,
       });
     }
-    // 不只看目标升级：能提升当前目标工厂/产出工厂的升级也可能是捷径，
-    // 例如“骨髓”会直接放大骨骼产出。
+    // 能提升“直接产出目标资源的工厂”的升级也是捷径，例如骨髓放大骨骼。
     for (const upgrade of node.state.upgrades) {
       if (upgrade.purchased || !upgradeActionable(node.state, upgrade)) continue;
       const isTargetUpgrade = targetUpgrade?.id === upgrade.id;
       if (!isTargetUpgrade) {
         if (upgrade.multiplier <= 1) continue;
-        if (!relevantFactoryIds.has(upgrade.targetFactoryId)) continue;
+        if (!directFactoryIds.has(upgrade.targetFactoryId)) continue;
       }
       items.push({
         kind: 'upgrade',
@@ -573,7 +575,7 @@ export function planStateSpace(
         ];
         const nextHeuristic = targetHeuristic(next, target, offlineMultiplier);
         if (!Number.isFinite(nextHeuristic)) continue;
-        heap.push({
+        const nextNode: SearchNode = {
           state: next,
           time,
           f: time + nextHeuristic,
@@ -581,9 +583,32 @@ export function planStateSpace(
           offlineBlocks: offlineBlock,
           onlineTime: node.onlineTime + (wait.offline ? 0 : wait.seconds),
           offlineTime: node.offlineTime + (wait.offline ? wait.seconds : 0),
-        });
+        };
+        if (targetReached(next, target)) {
+          if (!bestTarget || nextNode.time < bestTarget.time - 1e-9) {
+            bestTarget = nextNode;
+          }
+          continue;
+        }
+        heap.push(nextNode);
       }
     }
+  }
+
+  if (bestTarget) {
+    return {
+      steps: bestTarget.steps,
+      complete: false,
+      goal: 'unlock',
+      goalLabel: targetLabel(target),
+      total: bestTarget.time,
+      strategy: 'search',
+      offlineBlocks: bestTarget.offlineBlocks,
+      onlineTime: bestTarget.onlineTime,
+      offlineTime: bestTarget.offlineTime,
+      baselineTotal: bestTarget.time,
+      adDoubled: options.adDoubling === true,
+    };
   }
 
   return {

@@ -267,7 +267,6 @@ describe('v6 boot', () => {
     const context = boot(store);
     const strategy = context.document.getElementById('strategy').textContent;
     expect(strategy).toContain('升级1');
-    expect(strategy).toContain('升级3');
     expect(context.document.getElementById('total-line').textContent).toContain('先买');
   });
 

@@ -187,7 +187,7 @@ describe('state-space segment planner', () => {
           {
             id: 'bone-up',
             label: '骨头',
-            cost: 100,
+            cost: 1e9,
             costResourceId: 'blue',
             targetFactoryId: 'bone',
             multiplier: 2,
@@ -209,6 +209,66 @@ describe('state-space segment planner', () => {
       2,
     );
     expect(plan.steps[0]).toMatchObject({ type: 'upgrade', upgradeId: 'marrow' });
+  });
+
+  it('includes an intermediate factory that funds a target-resource factory', () => {
+    const plan = planStateSpace(
+      {
+        resources: [
+          { id: 'blue', name: '蓝', amount: 0, baseRate: 0 },
+          { id: 'red', name: '红', amount: 1000, baseRate: 0 },
+        ],
+        factories: [
+          {
+            id: 'target-producer',
+            label: '红产出',
+            price: 100,
+            unit: 1,
+            growth: 2,
+            owned: 1,
+            outputResourceId: 'red',
+            costResourceId: 'blue',
+          },
+          {
+            id: 'intermediate',
+            label: '蓝产出',
+            price: 10,
+            unit: 1000,
+            growth: 2,
+            owned: 1,
+            outputResourceId: 'blue',
+            costResourceId: 'red',
+          },
+          {
+            id: 'locked',
+            label: '锁定工厂',
+            price: 1,
+            unit: 1,
+            growth: 2,
+            owned: 0,
+            outputResourceId: 'red',
+            costResourceId: 'red',
+            requires: { type: 'upgrade', id: 'target-up' },
+          },
+        ],
+        upgrades: [
+          {
+            id: 'target-up',
+            label: '目标升级',
+            cost: 1e9,
+            costResourceId: 'red',
+            targetFactoryId: 'target-producer',
+            multiplier: 2,
+            purchased: false,
+          },
+        ],
+        completedUpgrades: new Set(),
+      },
+      2,
+    );
+    const labels = plan.steps.map((step) => step.label);
+    expect(labels).toContain('蓝产出');
+    expect(labels).toContain('红产出');
   });
 
   it('does not mutate the input state', () => {

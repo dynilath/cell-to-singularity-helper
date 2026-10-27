@@ -66,6 +66,20 @@ describe('life anatomy preset', () => {
       targetFactoryId: findFactory(store, '肌肉').id,
     });
     expect(findFactory(store, '心脏').requires).toBeNull();
+    expect(findFactory(store, '肌肉')).toMatchObject({ unit: '10.0M' });
+    const skinUpgrades = ['甲状腺', '皮下组织', '表皮层', '真皮层', '松果体'];
+    expect(store.upgrades.map((upgrade) => upgrade.name)).toEqual(
+      expect.arrayContaining(skinUpgrades),
+    );
+    expect(store.upgrades.find((upgrade) => upgrade.name === '甲状腺')).toMatchObject({
+      targetFactoryId: findFactory(store, '内分泌系统').id,
+      multiplier: '5',
+      requires: { type: 'factory', id: findFactory(store, '皮肤').id },
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '松果体')).toMatchObject({
+      targetFactoryId: findFactory(store, '内分泌系统').id,
+      multiplier: '7.50B',
+    });
   });
 
   it('scales anatomy from its reputation-1 document baseline', () => {

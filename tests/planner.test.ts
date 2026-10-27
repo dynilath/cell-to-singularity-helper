@@ -479,6 +479,71 @@ describe('planExploration', () => {
     expect(offline.total).toBeLessThan(20000 / 20);
   });
 
+  it('falls back to the nearest actionable prerequisite when the full goal is blocked', () => {
+    const state = {
+      resources: [{ id: 'r', name: 'r', amount: 0, baseRate: 10 }],
+      factories: [
+        {
+          id: 'a',
+          label: '基础工厂',
+          price: 1e15,
+          unit: 1,
+          growth: 2,
+          owned: 1,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+        },
+        {
+          id: 'b',
+          label: '可解锁工厂',
+          price: 1000,
+          unit: 1,
+          growth: 2,
+          owned: 0,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          requires: { type: 'upgrade', id: 'u1' },
+        },
+        {
+          id: 'c',
+          label: '死锁工厂',
+          price: 1000,
+          unit: 1,
+          growth: 2,
+          owned: 0,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          requires: { type: 'upgrade', id: 'u2' },
+        },
+      ],
+      upgrades: [
+        {
+          id: 'u1',
+          label: '前置升级',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'a',
+          multiplier: 1,
+          purchased: false,
+        },
+        {
+          id: 'u2',
+          label: '死锁升级',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'c',
+          multiplier: 1,
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set(),
+    };
+    const result = planExploration(state);
+    expect(result.goal).toBe('unlock');
+    expect(result.complete).toBe(false);
+    expect(result.steps[0]).toMatchObject({ type: 'upgrade', upgradeId: 'u1' });
+  });
+
   it('buys an affordable next factory immediately instead of delaying it into a batch', () => {
     const state = {
       resources: [{ id: 'r', name: 'r', amount: 4.94e13, baseRate: 0 }],

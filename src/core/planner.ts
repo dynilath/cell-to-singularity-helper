@@ -282,6 +282,10 @@ export function planExploration(input: State): PlanResult {
   }
 
   const result = searchPlan(start, goal, greedy.complete ? greedy : null);
+  if (result.steps.length === 0 && !result.complete) {
+    const fallback = fallbackGatePlan(start);
+    if (fallback) return fallback;
+  }
   return {
     steps: result.steps,
     complete: result.complete,
@@ -292,6 +296,179 @@ export function planExploration(input: State): PlanResult {
         : `完成全部 ${start.upgrades.length} 个升级`,
     total: result.total,
   };
+}
+
+/**
+ * 搜索完全失败时，至少给出“下一个可执行前置”的一段计划：
+ * 找到锁定项最近的可执行前置升级/工厂，只规划到它，买完再重新规划。
+ */
+function fallbackGatePlan(state: State): PlanResult | null {
+  const target = findNextGateTarget(state);
+  if (!target) return null;
+  const rates = searchRates(state);
+  if (target.kind === 'upgrade') {
+    const upgrade = state.upgrades.find((item) => item.id === target.id);
+    if (!upgrade) return null;
+    const amount = searchAmount(state, upgrade.costResourceId);
+    const rate = rates.get(upgrade.costResourceId) ?? 0;
+    if (rate <= 1e-9 && amount < upgrade.cost) return null;
+    const wait = amount >= upgrade.cost ? 0 : (upgrade.cost - amount) / rate;
+    return {
+      steps: [
+        {
+          type: 'upgrade',
+          upgradeId: upgrade.id,
+          label: upgrade.label,
+          cost: upgrade.cost,
+          resourceId: upgrade.costResourceId,
+          resourceName: resourceNameOf(state, upgrade.costResourceId),
+          t: wait,
+        },
+      ],
+      complete: false,
+      goal: 'unlock',
+      goalLabel: `先解锁「${upgrade.label}」`,
+      total: wait,
+    };
+  }
+  const factory = state.factories.find((item) => item.id === target.id);
+  if (!factory) return null;
+  const amount = searchAmount(state, factory.costResourceId);
+  const rate = rates.get(factory.costResourceId) ?? 0;
+  if (rate <= 1e-9 && amount < factory.price) return null;
+  const wait = amount >= factory.price ? 0 : (factory.price - amount) / rate;
+  return {
+    steps: [
+      {
+        type: 'buy',
+        factoryId: factory.id,
+        label: factory.label,
+        nth: factory.owned + 1,
+        price: factory.price,
+        resourceId: factory.costResourceId,
+        resourceName: resourceNameOf(state, factory.costResourceId),
+        t: wait,
+      },
+    ],
+    complete: false,
+    goal: 'unlock',
+    goalLabel:
+      target.requiredOwned > 1
+        ? `先把「${factory.label}」补到 ${target.requiredOwned} 台`
+        : `先买出「${factory.label}」首台`,
+    total: wait,
+  };
+}
+
+interface GateTarget {
+  kind: 'factory' | 'upgrade';
+  id: string;
+  requiredOwned: number;
+  wait: number;
+}
+
+function findNextGateTarget(state: State): GateTarget | null {
+  const rates = searchRates(state);
+  const factoryRequired = new Map<string, number>();
+  const visited = new Set<string>();
+  const candidates = new Map<string, GateTarget>();
+  const factoryById = new Map(state.factories.map((item) => [item.id, item]));
+  const upgradeById = new Map(state.upgrades.map((item) => [item.id, item]));
+
+  const addUpgradeCandidate = (upgrade: UpgradeState) => {
+    if (upgrade.purchased) return;
+    if (!upgradeActionable(state, upgrade)) return;
+    const rate = rates.get(upgrade.costResourceId) ?? 0;
+    const amount = searchAmount(state, upgrade.costResourceId);
+    const missing = Math.max(0, upgrade.cost - amount);
+    if (missing > 0 && rate <= 1e-9) return;
+    const wait = missing <= 0 ? 0 : missing / rate;
+    candidates.set(`u:${upgrade.id}`, {
+      kind: 'upgrade',
+      id: upgrade.id,
+      requiredOwned: 1,
+      wait,
+    });
+  };
+
+  const addFactoryCandidate = (factory: FactoryState, requiredOwned: number) => {
+    if (!factoryActionable(state, factory)) return;
+    if (factory.owned >= requiredOwned) return;
+    const rate = rates.get(factory.costResourceId) ?? 0;
+    const amount = searchAmount(state, factory.costResourceId);
+    const missing = Math.max(0, factory.price - amount);
+    if (missing > 0 && rate <= 1e-9) return;
+    const wait = missing <= 0 ? 0 : missing / rate;
+    candidates.set(`f:${factory.id}`, {
+      kind: 'factory',
+      id: factory.id,
+      requiredOwned,
+      wait,
+    });
+  };
+
+  const visitUpgrade = (upgradeId: string) => {
+    const key = `u:${upgradeId}`;
+    if (visited.has(key)) return;
+    visited.add(key);
+    const upgrade = upgradeById.get(upgradeId);
+    if (!upgrade || upgrade.purchased) return;
+    addFactoryRequirement(upgrade.targetFactoryId, 1);
+    if (upgrade.requires?.type === 'upgrade') {
+      const required = upgradeById.get(upgrade.requires.id);
+      if (required && !required.purchased) {
+        if (upgradeActionable(state, required)) addUpgradeCandidate(required);
+        else visitUpgrade(required.id);
+      }
+    } else if (upgrade.requires?.type === 'factory') {
+      addFactoryRequirement(
+        upgrade.requires.id,
+        Math.max(1, upgrade.requires.owned ?? 1),
+      );
+    }
+  };
+
+  const addFactoryRequirement = (factoryId: string, requiredOwned: number) => {
+    const key = `f:${factoryId}`;
+    const factory = factoryById.get(factoryId);
+    if (!factory) return;
+    const desired = Math.max(factoryRequired.get(factoryId) ?? 1, requiredOwned);
+    factoryRequired.set(factoryId, desired);
+    if (factoryActionable(state, factory)) {
+      addFactoryCandidate(factory, desired);
+    }
+    if (visited.has(key)) return;
+    visited.add(key);
+    if (factory.requires?.type === 'upgrade') {
+      const required = upgradeById.get(factory.requires.id);
+      if (required && !required.purchased) {
+        if (upgradeActionable(state, required)) addUpgradeCandidate(required);
+        else visitUpgrade(required.id);
+      }
+    } else if (factory.requires?.type === 'factory') {
+      addFactoryRequirement(
+        factory.requires.id,
+        Math.max(1, factory.requires.owned ?? 1),
+      );
+    }
+  };
+
+  for (const upgrade of state.upgrades) {
+    if (!upgrade.purchased && !upgradeActionable(state, upgrade)) {
+      visitUpgrade(upgrade.id);
+    }
+  }
+  for (const factory of state.factories) {
+    if (factory.owned < 1 && !factoryActionable(state, factory)) {
+      addFactoryRequirement(factory.id, 1);
+    }
+  }
+
+  let best: GateTarget | null = null;
+  for (const candidate of candidates.values()) {
+    if (!best || candidate.wait < best.wait - 1e-9) best = candidate;
+  }
+  return best;
 }
 
 /**

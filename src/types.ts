@@ -141,7 +141,7 @@ export interface PlanStep {
 export interface PlanResult {
   steps: PlanStep[];
   complete: boolean;
-  goal: 'new-factory' | 'upgrades';
+  goal: 'new-factory' | 'upgrades' | 'unlock';
   goalLabel: string;
   total: number;
   strategy?: PlanStrategy;

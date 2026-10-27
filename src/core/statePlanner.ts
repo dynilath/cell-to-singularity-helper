@@ -463,6 +463,21 @@ export function planStateSpace(
       ? targetUpgrade.costResourceId
       : targetFactory?.costResourceId;
     const targetRate = targetResourceId ? (rates.get(targetResourceId) ?? 0) : 0;
+    const relevantFactoryIds = new Set<string>();
+    // 只收“能产出目标花费资源”的工厂，以及目标工厂本身；
+    // 不要求工厂产出和成本是同一资源，目标工厂永远保留。
+    for (const factory of node.state.factories) {
+      if (!factoryActionable(node.state, factory)) continue;
+      const isTarget = targetFactory?.id === factory.id;
+      if (!isTarget && factory.outputResourceId !== targetResourceId) continue;
+      if (
+        !isTarget &&
+        factory.unit * (node.state.globalAdMultiplier ?? 1) < targetRate * 0.001
+      ) {
+        continue;
+      }
+      relevantFactoryIds.add(factory.id);
+    }
     const items: {
       kind: TargetKind;
       id: string;
@@ -471,14 +486,8 @@ export function planStateSpace(
       resourceId: string;
     }[] = [];
     for (const factory of node.state.factories) {
-      if (!factoryActionable(node.state, factory)) continue;
+      if (!relevantFactoryIds.has(factory.id)) continue;
       if (factory.owned >= (maxOwned.get(factory.id) ?? factory.owned)) continue;
-      const isTarget = targetFactory?.id === factory.id;
-      // 成本资源和产出资源可以不同；不要再按“产出 == 目标资源”过滤。
-      // 只排除相对于当前产出可忽略的工厂，目标工厂永远保留。
-      if (!isTarget && factory.unit * (node.state.globalAdMultiplier ?? 1) < targetRate * 0.001) {
-        continue;
-      }
       items.push({
         kind: 'factory',
         id: factory.id,
@@ -487,13 +496,21 @@ export function planStateSpace(
         resourceId: factory.costResourceId,
       });
     }
-    if (targetUpgrade && upgradeActionable(node.state, targetUpgrade)) {
+    // 不只看目标升级：能提升当前目标工厂/产出工厂的升级也可能是捷径，
+    // 例如“骨髓”会直接放大骨骼产出。
+    for (const upgrade of node.state.upgrades) {
+      if (upgrade.purchased || !upgradeActionable(node.state, upgrade)) continue;
+      const isTargetUpgrade = targetUpgrade?.id === upgrade.id;
+      if (!isTargetUpgrade) {
+        if (upgrade.multiplier <= 1) continue;
+        if (!relevantFactoryIds.has(upgrade.targetFactoryId)) continue;
+      }
       items.push({
         kind: 'upgrade',
-        id: targetUpgrade.id,
-        label: targetUpgrade.label,
-        cost: targetUpgrade.cost,
-        resourceId: targetUpgrade.costResourceId,
+        id: upgrade.id,
+        label: upgrade.label,
+        cost: upgrade.cost,
+        resourceId: upgrade.costResourceId,
       });
     }
 

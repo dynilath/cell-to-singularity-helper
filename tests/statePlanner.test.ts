@@ -153,6 +153,64 @@ describe('state-space segment planner', () => {
     expect(plan.steps[0]).toMatchObject({ type: 'buy', factoryId: 'muscle' });
   });
 
+  it('includes a relevant upgrade that boosts the target factory', () => {
+    const plan = planStateSpace(
+      {
+        resources: [
+          { id: 'blue', name: '蓝', amount: 1e6, baseRate: 0 },
+          { id: 'red', name: '红', amount: 1e6, baseRate: 0 },
+        ],
+        factories: [
+          {
+            id: 'bone',
+            label: '骨骼',
+            price: 100,
+            unit: 10,
+            growth: 2,
+            owned: 1,
+            outputResourceId: 'blue',
+            costResourceId: 'red',
+          },
+          {
+            id: 'locked',
+            label: '被锁工厂',
+            price: 100,
+            unit: 1,
+            growth: 2,
+            owned: 0,
+            outputResourceId: 'blue',
+            costResourceId: 'red',
+            requires: { type: 'upgrade', id: 'bone-up' },
+          },
+        ],
+        upgrades: [
+          {
+            id: 'bone-up',
+            label: '骨头',
+            cost: 100,
+            costResourceId: 'blue',
+            targetFactoryId: 'bone',
+            multiplier: 2,
+            purchased: false,
+            requires: { type: 'factory', id: 'bone' },
+          },
+          {
+            id: 'marrow',
+            label: '骨髓',
+            cost: 1,
+            costResourceId: 'red',
+            targetFactoryId: 'bone',
+            multiplier: 10,
+            purchased: false,
+          },
+        ],
+        completedUpgrades: new Set(),
+      },
+      2,
+    );
+    expect(plan.steps[0]).toMatchObject({ type: 'upgrade', upgradeId: 'marrow' });
+  });
+
   it('does not mutate the input state', () => {
     const state = boneState();
     const before = JSON.stringify({

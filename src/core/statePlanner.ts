@@ -10,6 +10,7 @@ import type {
 const OFFLINE_CHUNK_SECONDS = 180;
 const MAX_NODES = 20_000;
 const MAX_FRONTIER = 32;
+const MAX_ACTION_DEPTH = 8;
 
 interface State extends SimulationState {
   time?: number;
@@ -372,6 +373,78 @@ function nextTarget(state: State): Target | null {
   return findLockedTarget(state) ?? findOpenTarget(state);
 }
 
+/**
+ * 统一收集当前分段可用动作：
+ * 1. 目标花费资源的生产工厂；
+ * 2. 这些工厂对应的升级；
+ * 3. 把工厂/升级的成本资源加入目标资源；
+ * 4. 重复，直到不再增加或达到深度限制。
+ */
+function collectSegmentActions(state: State, target: Target) {
+  const factoryIds = new Set<string>();
+  const upgradeIds = new Set<string>();
+  const targetResources = new Set<string>();
+  const targetUpgrade =
+    target.kind === 'upgrade'
+      ? state.upgrades.find((upgrade) => upgrade.id === target.id)
+      : null;
+  const targetFactory =
+    target.kind === 'factory'
+      ? state.factories.find((factory) => factory.id === target.id)
+      : null;
+
+  if (targetUpgrade) {
+    upgradeIds.add(targetUpgrade.id);
+    targetResources.add(targetUpgrade.costResourceId);
+    const targetOfUpgrade = state.factories.find(
+      (factory) => factory.id === targetUpgrade.targetFactoryId,
+    );
+    if (targetOfUpgrade) {
+      factoryIds.add(targetOfUpgrade.id);
+      targetResources.add(targetOfUpgrade.costResourceId);
+    }
+  }
+  if (targetFactory) {
+    factoryIds.add(targetFactory.id);
+    targetResources.add(targetFactory.costResourceId);
+  }
+
+  for (let depth = 0; depth < MAX_ACTION_DEPTH; depth += 1) {
+    let changed = false;
+    for (const factory of state.factories) {
+      if (!factoryActionable(state, factory)) continue;
+      if (factoryIds.has(factory.id)) {
+        if (!targetResources.has(factory.costResourceId)) {
+          targetResources.add(factory.costResourceId);
+          changed = true;
+        }
+        continue;
+      }
+      if (!targetResources.has(factory.outputResourceId)) continue;
+      factoryIds.add(factory.id);
+      targetResources.add(factory.costResourceId);
+      changed = true;
+    }
+    for (const upgrade of state.upgrades) {
+      if (upgrade.purchased || !upgradeActionable(state, upgrade)) continue;
+      if (upgradeIds.has(upgrade.id)) {
+        if (!targetResources.has(upgrade.costResourceId)) {
+          targetResources.add(upgrade.costResourceId);
+          changed = true;
+        }
+        continue;
+      }
+      if (upgrade.multiplier <= 1) continue;
+      if (!factoryIds.has(upgrade.targetFactoryId)) continue;
+      upgradeIds.add(upgrade.id);
+      targetResources.add(upgrade.costResourceId);
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return { factoryIds, upgradeIds };
+}
+
 function targetLabel(target: Target) {
   if (target.kind === 'upgrade') return `先买「${target.label}」`;
   return target.requiredOwned > 1
@@ -442,45 +515,7 @@ export function planStateSpace(
     frontiers.set(key, addFrontier(frontier, node.state, node.time));
 
     const rates = ratesOf(node.state);
-    const targetUpgrade =
-      target.kind === 'upgrade'
-        ? node.state.upgrades.find((upgrade) => upgrade.id === target.id)
-        : null;
-    const targetFactory =
-      target.kind === 'factory'
-        ? node.state.factories.find((factory) => factory.id === target.id)
-        : null;
-    const targetResourceId = targetUpgrade
-      ? targetUpgrade.costResourceId
-      : targetFactory?.costResourceId;
-    const directFactoryIds = new Set<string>();
-    if (targetFactory) directFactoryIds.add(targetFactory.id);
-    for (const factory of node.state.factories) {
-      if (!factoryActionable(node.state, factory)) continue;
-      if (factory.outputResourceId === targetResourceId) directFactoryIds.add(factory.id);
-    }
-    // 目标资源的生产工厂可能消耗另一种资源；继续向下收集生产那种资源的工厂。
-    // 这些“间接工厂”也能让目标工厂更早买得起。
-    const relevantFactoryIds = new Set(directFactoryIds);
-    const neededResources = new Set<string>();
-    if (targetResourceId) neededResources.add(targetResourceId);
-    for (let depth = 0; depth < 4; depth += 1) {
-      let changed = false;
-      for (const factory of node.state.factories) {
-        if (!factoryActionable(node.state, factory)) continue;
-        if (
-          neededResources.has(factory.outputResourceId) &&
-          !relevantFactoryIds.has(factory.id)
-        ) {
-          relevantFactoryIds.add(factory.id);
-          changed = true;
-        }
-        if (relevantFactoryIds.has(factory.id)) {
-          neededResources.add(factory.costResourceId);
-        }
-      }
-      if (!changed) break;
-    }
+    const { factoryIds, upgradeIds } = collectSegmentActions(node.state, target);
     const items: {
       kind: TargetKind;
       id: string;
@@ -489,7 +524,7 @@ export function planStateSpace(
       resourceId: string;
     }[] = [];
     for (const factory of node.state.factories) {
-      if (!relevantFactoryIds.has(factory.id)) continue;
+      if (!factoryIds.has(factory.id)) continue;
       if (factory.owned >= (maxOwned.get(factory.id) ?? factory.owned)) continue;
       items.push({
         kind: 'factory',
@@ -499,14 +534,8 @@ export function planStateSpace(
         resourceId: factory.costResourceId,
       });
     }
-    // 能提升“直接产出目标资源的工厂”的升级也是捷径，例如骨髓放大骨骼。
     for (const upgrade of node.state.upgrades) {
-      if (upgrade.purchased || !upgradeActionable(node.state, upgrade)) continue;
-      const isTargetUpgrade = targetUpgrade?.id === upgrade.id;
-      if (!isTargetUpgrade) {
-        if (upgrade.multiplier <= 1) continue;
-        if (!directFactoryIds.has(upgrade.targetFactoryId)) continue;
-      }
+      if (!upgradeIds.has(upgrade.id)) continue;
       items.push({
         kind: 'upgrade',
         id: upgrade.id,

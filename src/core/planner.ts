@@ -582,8 +582,34 @@ function tryCheckpointInsertion(input: State, base: PlanResult, offlineRate: num
   return improved ? best : null;
 }
 
-function planOfflineCore(input: State, offlineRate = 1, options: OfflineOptions = {}): PlanResult {
-  const base = planExploration(input);
+function offlineGatePlan(base: PlanResult, rate: number, adDoubled: boolean): PlanResult | null {
+  const step = base.steps[0];
+  if (!step || !(step.t > 0)) return null;
+  const offlineWait =
+    Math.ceil(step.t / rate / OFFLINE_CHUNK_SECONDS) * OFFLINE_CHUNK_SECONDS;
+  if (offlineWait >= step.t) return null;
+  return {
+    ...base,
+    steps: [
+      {
+        ...step,
+        t: offlineWait,
+        offline: true,
+        offlineBlock: 1,
+        offlineWait,
+      },
+    ],
+    total: offlineWait,
+    strategy: 'offline',
+    offlineBlocks: 1,
+    onlineTime: 0,
+    offlineTime: offlineWait,
+    baselineTotal: base.total,
+    adDoubled,
+  };
+}
+
+function planOfflineCore(input: State, offlineRate = 1, options: OfflineOptions = {}): PlanResult {  const base = planExploration(input);
   const adDoubling = options.adDoubling === true;
   // 离线收入广告是「整段离线收入 ×2」，不是半程才翻倍。
   const rate =
@@ -593,12 +619,18 @@ function planOfflineCore(input: State, offlineRate = 1, options: OfflineOptions 
     ...base,
     strategy: 'offline',
     offlineBlocks: 0,
-    onlineTime: 0,
-    offlineTime: base.total,
+    onlineTime: base.total,
+    offlineTime: 0,
     baselineTotal: base.total,
     adDoubled: adDoubling,
   };
-  if (!base.complete || base.steps.length === 0) return baseResult;
+  if (!base.complete || base.steps.length === 0) {
+    if (base.goal === 'unlock' && base.steps.length === 1) {
+      const gate = offlineGatePlan(base, rate, adDoubling);
+      if (gate) return gate;
+    }
+    return baseResult;
+  }
 
   const state = offlineClone(input);
   const targetId =

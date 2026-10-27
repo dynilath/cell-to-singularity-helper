@@ -544,6 +544,74 @@ describe('planExploration', () => {
     expect(result.steps[0]).toMatchObject({ type: 'upgrade', upgradeId: 'u1' });
   });
 
+  it('uses a 3-minute offline block for an unlock fallback instead of an online wait', () => {
+    const state = {
+      resources: [{ id: 'r', name: 'r', amount: 0, baseRate: 10 }],
+      factories: [
+        {
+          id: 'a',
+          label: '基础工厂',
+          price: 1e15,
+          unit: 1,
+          growth: 2,
+          owned: 1,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+        },
+        {
+          id: 'b',
+          label: '可解锁工厂',
+          price: 1000,
+          unit: 1,
+          growth: 2,
+          owned: 0,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          requires: { type: 'upgrade', id: 'u1' },
+        },
+        {
+          id: 'c',
+          label: '死锁工厂',
+          price: 1000,
+          unit: 1,
+          growth: 2,
+          owned: 0,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          requires: { type: 'upgrade', id: 'u2' },
+        },
+      ],
+      upgrades: [
+        {
+          id: 'u1',
+          label: '前置升级',
+          cost: 10000,
+          costResourceId: 'r',
+          targetFactoryId: 'a',
+          multiplier: 1,
+          purchased: false,
+        },
+        {
+          id: 'u2',
+          label: '死锁升级',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'c',
+          multiplier: 1,
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set(),
+    };
+    const online = planExploration(state);
+    const offline = planOfflineExploration(state, 2, { adDoubling: true });
+    expect(offline.goal).toBe('unlock');
+    expect(offline.steps[0]).toMatchObject({ upgradeId: 'u1', offline: true });
+    expect(offline.steps[0].offlineWait).toBe(360);
+    expect(offline.total).toBe(360);
+    expect(offline.total).toBeLessThan(online.total);
+  });
+
   it('buys an affordable next factory immediately instead of delaying it into a batch', () => {
     const state = {
       resources: [{ id: 'r', name: 'r', amount: 4.94e13, baseRate: 0 }],

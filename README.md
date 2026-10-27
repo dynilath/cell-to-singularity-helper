@@ -3,9 +3,9 @@
 ## 部署
 
 ```bash
-npm install
-npm run build
-npm run verify
+pnpm install
+pnpm build
+pnpm verify
 ```
 
 构建产物：`dist/index.html`。

@@ -2,7 +2,7 @@
  * 构建产物冒烟测试：确认 dist/index.html 完全自包含，并能在
  * 不经过打包器的环境里启动、计算、保存到 localStorage。
  *
- * 运行：npm run build && npm run verify
+ * 运行：pnpm build && pnpm verify
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

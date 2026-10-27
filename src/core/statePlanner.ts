@@ -473,8 +473,14 @@ export function planStateSpace(
     for (const factory of node.state.factories) {
       if (!factoryActionable(node.state, factory)) continue;
       if (factory.owned >= (maxOwned.get(factory.id) ?? factory.owned)) continue;
-      if (targetResourceId && factory.outputResourceId !== targetResourceId) continue;
       const isTarget = targetFactory?.id === factory.id;
+      if (
+        !isTarget &&
+        targetResourceId &&
+        factory.outputResourceId !== targetResourceId
+      ) {
+        continue;
+      }
       if (!isTarget && factory.unit * (node.state.globalAdMultiplier ?? 1) < targetRate * 0.001) {
         continue;
       }

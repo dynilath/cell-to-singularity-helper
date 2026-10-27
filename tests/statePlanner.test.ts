@@ -116,6 +116,43 @@ describe('state-space segment planner', () => {
     expect(plan.offlineBlocks).toBe(1);
   });
 
+  it('keeps a target factory whose cost and output use different resources', () => {
+    const plan = planStateSpace(
+      {
+        resources: [
+          { id: 'blue', name: '蓝', amount: 1e6, baseRate: 0 },
+          { id: 'red', name: '红', amount: 1e6, baseRate: 0 },
+        ],
+        factories: [
+          {
+            id: 'heart',
+            label: '心脏',
+            price: 100,
+            unit: 10,
+            growth: 2,
+            owned: 1,
+            outputResourceId: 'red',
+            costResourceId: 'blue',
+          },
+          {
+            id: 'muscle',
+            label: '肌肉',
+            price: 100,
+            unit: 20,
+            growth: 2,
+            owned: 0,
+            outputResourceId: 'blue',
+            costResourceId: 'red',
+          },
+        ],
+        upgrades: [],
+        completedUpgrades: new Set(),
+      },
+      2,
+    );
+    expect(plan.steps[0]).toMatchObject({ type: 'buy', factoryId: 'muscle' });
+  });
+
   it('does not mutate the input state', () => {
     const state = boneState();
     const before = JSON.stringify({

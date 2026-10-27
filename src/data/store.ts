@@ -249,7 +249,7 @@ export function saveStore(storage, store) {
 }
 
 /**
- * @returns {{ volume: number, half: boolean, notation: 'short' | 'chinese' | 'scientific', offlineRate: number, hideLockedUpgrades: boolean, planStrategy: 'online' | 'offline', globalAdMultiplier: 1 | 2 | 4 }}
+ * @returns {{ volume: number, half: boolean, notation: 'short' | 'chinese' | 'scientific', offlineRate: number, hideLockedUpgrades: boolean, globalAdMultiplier: 1 | 2 | 4 }}
  */
 export function loadSettings(storage) {
   let volume = 1;
@@ -292,13 +292,6 @@ export function loadSettings(storage) {
     hideLockedUpgrades = false;
   }
 
-  let planStrategy = 'online';
-  try {
-    planStrategy = storage.getItem(SETTING_KEYS.planStrategy) === 'offline' ? 'offline' : 'online';
-  } catch {
-    planStrategy = 'online';
-  }
-
   let globalAdMultiplier = 1;
   try {
     const parsed = Number.parseFloat(
@@ -315,7 +308,6 @@ export function loadSettings(storage) {
     notation,
     offlineRate,
     hideLockedUpgrades,
-    planStrategy,
     globalAdMultiplier,
   };
 }
@@ -355,17 +347,6 @@ export function saveOfflineRate(storage, rate) {
 export function saveHideLockedUpgrades(storage, hide) {
   try {
     storage.setItem(SETTING_KEYS.hideLockedUpgrades, hide ? '1' : '0');
-  } catch {
-    // 同上。
-  }
-}
-
-export function savePlanStrategy(storage, strategy) {
-  try {
-    storage.setItem(
-      SETTING_KEYS.planStrategy,
-      strategy === 'offline' ? 'offline' : 'online',
-    );
   } catch {
     // 同上。
   }

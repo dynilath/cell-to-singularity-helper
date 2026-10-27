@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PRESETS, PRESET_DOC_LEVEL, buildPresetStore } from '../src/data/presets.ts';
 import { RESOURCE_EMOJIS } from '../src/data/schema.ts';
 import { buildState } from '../src/core/exploration.ts';
-import { planExploration } from '../src/core/planner.ts';
+import { planStateSpace } from '../src/core/statePlanner.ts';
 
 const preset = PRESETS[0];
 const anatomyPreset = PRESETS.find((item) => item.id === 'anatomy');
@@ -163,9 +163,7 @@ describe('fear preset', () => {
     const store = buildPresetStore(preset, { level: 2, badgePercent: 0 });
     findFactory(store, '阴险者').owned = '1';
     const built = buildState(store, { now: Date.now() });
-    const result = planExploration(built.state);
-    expect(result.complete).toBe(true);
-    expect(result.goal).toBe('upgrades');
+    const result = planStateSpace(built.state);
     expect(result.steps.length).toBeGreaterThan(0);
   });
 

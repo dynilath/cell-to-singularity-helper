@@ -1,5 +1,5 @@
 export type NotationMode = 'short' | 'chinese' | 'scientific';
-export type PlanStrategy = 'search' | 'online' | 'offline';
+export type PlanStrategy = 'search';
 export type GlobalAdMultiplier = 1 | 2 | 4;
 
 export interface Requirement {
@@ -170,7 +170,6 @@ export interface Settings {
   notation: NotationMode;
   offlineRate: number;
   hideLockedUpgrades: boolean;
-  planStrategy: PlanStrategy;
   globalAdMultiplier: GlobalAdMultiplier;
 }
 

@@ -292,7 +292,7 @@ describe('v6 boot', () => {
       complete: false,
       total: 999,
       generatedAt: OPEN_TIME,
-      strategy: 'offline',
+      strategy: 'search',
       version: 1,
     };
     store.reminder = {

@@ -50,7 +50,7 @@ describe('planSummary', () => {
     const summary = planSummary({
       goal: 'upgrades',
       goalLabel: '完成全部 2 个升级',
-      strategy: 'offline',
+      strategy: 'search',
       offlineBlocks: 1,
       steps: [
         step('upgrade', '升级1', { offline: true }),

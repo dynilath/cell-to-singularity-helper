@@ -35,7 +35,6 @@ export const SETTING_KEYS = Object.freeze({
   notation: 'cts_notation',
   offlineRate: 'cts_offline_rate',
   hideLockedUpgrades: 'cts_hide_locked_upgrades',
-  planStrategy: 'cts_plan_strategy',
   globalAdMultiplier: 'cts_global_ad',
 });
 
@@ -314,7 +313,7 @@ function normalizePlan(raw, dataset, now) {
   const goal = toText(raw.goal) || 'upgrades';
   const lastT = steps[steps.length - 1].t;
   const total = toNumber(raw.total) ?? lastT;
-  const strategy = raw.strategy === 'offline' ? 'offline' : 'online';
+  const strategy = 'search';
   return {
     steps,
     anchor,
@@ -330,14 +329,10 @@ function normalizePlan(raw, dataset, now) {
     generatedAt: toNumber(raw.generatedAt) ?? now,
     strategy,
     offlineBlocks: Math.max(0, Math.trunc(toNumber(raw.offlineBlocks) ?? 0)),
-    onlineTime:
-      strategy === 'offline' ? Math.max(0, toNumber(raw.onlineTime) ?? 0) : total,
-    offlineTime:
-      strategy === 'offline'
-        ? Math.max(0, toNumber(raw.offlineTime) ?? total)
-        : 0,
+    onlineTime: Math.max(0, toNumber(raw.onlineTime) ?? total),
+    offlineTime: Math.max(0, toNumber(raw.offlineTime) ?? 0),
     baselineTotal: Math.max(0, toNumber(raw.baselineTotal) ?? total),
-    adDoubled: strategy === 'offline' && raw.adDoubled === true,
+    adDoubled: raw.adDoubled === true,
     version: Math.max(0, Math.trunc(toNumber(raw.version) ?? 0)),
   };
 }

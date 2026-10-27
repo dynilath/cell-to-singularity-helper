@@ -16,7 +16,6 @@ import {
   saveGlobalAdMultiplier,
   saveNotation,
   saveOfflineRate,
-  savePlanStrategy,
   saveStore,
   saveVolume,
 } from '../src/data/store.ts';
@@ -314,7 +313,6 @@ describe('settings', () => {
       notation: 'short',
       offlineRate: 1,
       hideLockedUpgrades: false,
-      planStrategy: 'online',
       globalAdMultiplier: 1,
     });
   });
@@ -326,7 +324,6 @@ describe('settings', () => {
     saveNotation(storage, 'chinese');
     saveOfflineRate(storage, 2.1);
     saveHideLockedUpgrades(storage, true);
-    savePlanStrategy(storage, 'offline');
     saveGlobalAdMultiplier(storage, 4);
 
     expect(loadSettings(storage)).toEqual({
@@ -335,7 +332,6 @@ describe('settings', () => {
       notation: 'chinese',
       offlineRate: 2.1,
       hideLockedUpgrades: true,
-      planStrategy: 'offline',
       globalAdMultiplier: 4,
     });
   });

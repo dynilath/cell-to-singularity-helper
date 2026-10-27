@@ -107,6 +107,18 @@ afterEach(() => {
 });
 
 describe('v6 boot', () => {
+  it('waits longer before planning while a data input is focused', () => {
+    const context = boot();
+    const amount = resourceInputs(context)[0];
+    amount.focus();
+    amount.value = '1000';
+    amount.dispatchEvent(new context.window.Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(400);
+    expect(savedStore(context).plan).toBeNull();
+    vi.advanceTimersByTime(600);
+    expect(savedStore(context).plan).not.toBeNull();
+  });
+
   it('applies the global ad multiplier from the top selector', () => {
     const context = boot();
     const before = savedStore(context).plan.total;

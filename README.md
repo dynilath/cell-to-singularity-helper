@@ -149,7 +149,7 @@ npm run check      # lint + typecheck + test + build + dist 冒烟
 
 `npm run build` 生成单文件 `dist/index.html`。根目录的 `index.html` 是 Vite 入口，不能直接双击打开。
 
-规划计算在浏览器中通过内联 Web Worker 执行；构建仍是单文件。快速购买只更新对应行和资源数量，不再整块重建编辑器。
+规划计算在浏览器中通过内联 Web Worker 执行；构建仍是单文件。快速购买只更新对应行和资源数量，不再整块重建编辑器。数据输入框保持焦点时，计划重算会等待 900ms 再启动；普通操作仍是 300ms 防抖。
 
 ### 目录
 

@@ -38,6 +38,7 @@ import { createStepView } from './ui/stepView.ts';
 import { byId } from './ui/dom.ts';
 
 const RECOMPUTE_DELAY_MS = 300;
+const TYPING_RECOMPUTE_DELAY_MS = 900;
 const TICK_MS = 500;
 
 export function createApp({ document, window }) {
@@ -201,6 +202,15 @@ export function createApp({ document, window }) {
     planView.reset();
   }
 
+  function isEditingData() {
+    const active = document.activeElement;
+    if (!active) return false;
+    if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName)) return false;
+    return Boolean(
+      active.closest('#resource-section, #upgrade-section, #factory-section'),
+    );
+  }
+
   function handleDataChange() {
     if (disposed) return;
     planGeneration += 1;
@@ -217,7 +227,7 @@ export function createApp({ document, window }) {
       const at = pendingRecomputeAt;
       pendingRecomputeAt = null;
       recompute({ userEdit: false, snapshotAt: at });
-    }, RECOMPUTE_DELAY_MS);
+    }, isEditingData() ? TYPING_RECOMPUTE_DELAY_MS : RECOMPUTE_DELAY_MS);
   }
 
   function cancelPendingRecompute() {

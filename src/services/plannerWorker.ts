@@ -1,10 +1,9 @@
-import { planExploration, planOfflineExploration } from '../core/planner.ts';
-import type { PlanResult, PlanStrategy, SimulationState } from '../types.ts';
+import { planStateSpace } from '../core/statePlanner.ts';
+import type { PlanResult, SimulationState } from '../types.ts';
 
 export interface PlannerWorkerRequest {
   id: number;
   state: SimulationState;
-  strategy: PlanStrategy;
   offlineRate: number;
   adDoubling: boolean;
 }
@@ -21,12 +20,9 @@ const scope = self as unknown as {
 };
 
 scope.onmessage = (event) => {
-  const { id, state, strategy, offlineRate, adDoubling } = event.data;
+  const { id, state, offlineRate, adDoubling } = event.data;
   try {
-    const result =
-      strategy === 'offline'
-        ? planOfflineExploration(state, offlineRate, { adDoubling })
-        : planExploration(state);
+    const result = planStateSpace(state, offlineRate, { adDoubling });
     scope.postMessage({ id, result });
   } catch (cause) {
     scope.postMessage({

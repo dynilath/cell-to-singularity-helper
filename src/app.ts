@@ -11,7 +11,6 @@ import {
   saveGlobalAdMultiplier,
   saveNotation,
   saveOfflineRate,
-  savePlanStrategy,
   saveStore,
   saveVolume,
 } from './data/store.ts';
@@ -26,7 +25,6 @@ import {
   reminderEndTime,
 } from './services/reminders.ts';
 import { createPlannerClient } from './services/plannerClient.ts';
-import type { PlanStrategy } from './types.ts';
 import { createAlarm } from './ui/alarm.ts';
 import { createDrawer } from './ui/drawer.ts';
 import { createEditor } from './ui/editor.ts';
@@ -50,8 +48,6 @@ export function createApp({ document, window }) {
   let plan = store.plan;
   let stepMode = Boolean(plan && plan.stepIndex < plan.steps.length);
   let offlineRate = settings.offlineRate;
-  let planStrategy: PlanStrategy =
-    settings.planStrategy === 'offline' ? 'offline' : 'online';
   let adDoubling = settings.half;
   let globalAdMultiplier = settings.globalAdMultiplier;
   let recomputeTimer = null;
@@ -346,8 +342,8 @@ export function createApp({ document, window }) {
     };
 
     const computation = synchronous
-      ? planner.computeSync(built.state, planStrategy, offlineRate, adDoubling)
-      : planner.compute(built.state, planStrategy, offlineRate, adDoubling);
+      ? planner.computeSync(built.state, offlineRate, adDoubling)
+      : planner.compute(built.state, offlineRate, adDoubling);
     if (computation instanceof Promise) {
       computation.then(applyResult).catch(showPlanError);
     } else {
@@ -458,6 +454,7 @@ export function createApp({ document, window }) {
       }
       syncArmButton();
       refreshDrawer();
+      if (plan.complete) handleDataChange();
     } else {
       handleDataChange();
     }
@@ -563,15 +560,16 @@ export function createApp({ document, window }) {
         if (hadReminder) {
           persistStore();
           planView.render({ plan, now: Date.now() });
-          fireDueNow('计划完成！', '所有目标都完成了，回游戏更新数据开始下一轮。');
         } else {
-          // 没有布防提醒时只完成计划，不用完成态提醒制造一次额外播报。
+          // 没有布防提醒时只完成计划，不再制造额外播报。
           store.reminder = null;
           persistStore();
           planView.render({ plan, now: Date.now() });
           syncArmButton();
           refreshDrawer();
         }
+        // 当前分段完成，立即为下一段重新做目标选择。
+        handleDataChange();
       } else {
         if (stepMode || isRunning(store.reminder)) armNextStep();
         syncArmButton();
@@ -675,18 +673,13 @@ export function createApp({ document, window }) {
 
     if (plan.stepIndex >= plan.steps.length) {
       plan.complete = true;
-      const wasNewFactory = plan.goal === 'new-factory';
       stepMode = false;
       stepView.hide();
       store.plan = plan;
       persistStore();
       planView.render({ plan, now: Date.now() });
-      if (wasNewFactory) {
-        fireDueNow('新工厂已解锁！', '规划目标已切换为完成全部升级。');
-        recompute({ userEdit: false });
-      } else {
-        fireDueNow('计划完成！', '所有目标都完成了，回游戏更新数据开始下一轮。');
-      }
+      // 当前分段完成，重新选择下一段目标；不要停在“全部完成”。
+      handleDataChange();
       return;
     }
     armNextStep();
@@ -729,10 +722,10 @@ export function createApp({ document, window }) {
       stepSeconds: step.t,
       halfEnabled: false,
       now,
-      // 在线方案：提醒等待按离线倍率（以及离线广告翻倍）缩短；
-      // 离线方案的计划时间已经算过倍率，提醒时不再乘。
+      // 离线段的时间已经乘过倍率，提醒时不能再除一次；
+      // 在线段仍按“离开游戏后的离线收益”提前提醒。
       offlineRate:
-        plan.strategy === 'offline'
+        step.offline === true
           ? 1
           : offlineRate * (adDoubling ? 2 : 1),
     });
@@ -772,22 +765,6 @@ export function createApp({ document, window }) {
     persistStore();
     alarm.maybeAskPermission();
     armReminder(plan.steps[plan.stepIndex]);
-  }
-
-  function fireDueNow(title, body) {
-    store.reminder = {
-      kind: 'full',
-      title,
-      body,
-      endTime: Date.now(),
-      durMs: 0,
-      fired: true,
-      paused: false,
-    };
-    persistStore();
-    alarm.show(title, body);
-    refreshDrawer();
-    syncArmButton();
   }
 
   function fireReminder(missed) {
@@ -933,16 +910,11 @@ export function createApp({ document, window }) {
     halfCheckbox.addEventListener('change', () => {
       adDoubling = halfCheckbox.checked;
       saveHalf(storage, adDoubling);
-      if (planStrategy === 'offline') recompute({ userEdit: true });
+      recompute({ userEdit: true });
     });
 
     const planStrategySelect = byId(document, 'plan-strategy');
-    planStrategySelect.value = planStrategy;
-    planStrategySelect.addEventListener('change', () => {
-      planStrategy = planStrategySelect.value === 'offline' ? 'offline' : 'online';
-      savePlanStrategy(storage, planStrategy);
-      recompute({ userEdit: true });
-    });
+    planStrategySelect.value = 'search';
 
     const offlineInput = byId(document, 'offline-rate');
     offlineInput.value = String(offlineRate);
@@ -966,10 +938,8 @@ export function createApp({ document, window }) {
       if (value === offlineRate) return;
       offlineRate = value;
       saveOfflineRate(storage, value);
-      if (planStrategy === 'offline') {
-        // 离线攒钱方案的时间直接依赖该倍率，必须重算。
-        recompute({ userEdit: true });
-      }
+      // 规划会同时尝试在线等待和离线段，倍率变化必须重算。
+      recompute({ userEdit: true });
     });
 
     const slider = byId(document, 'volume');

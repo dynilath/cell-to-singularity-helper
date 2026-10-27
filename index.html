@@ -106,8 +106,7 @@
       <label class="plan-strategy">
         <span>策略</span>
         <select id="plan-strategy">
-          <option value="online">在线最快</option>
-          <option value="offline">离线攒钱</option>
+          <option value="search">状态空间搜索</option>
         </select>
       </label>
     </div>
@@ -126,13 +125,13 @@
         <button type="button" class="warn" id="start-steps">▶ 逐步执行此计划</button>
       </div>
       <label class="opt-row"><input type="checkbox" id="half-cb"> 离线收入广告翻倍</label>
-      <div class="hint">启用后整段离线收入 ×2（不是只翻后半程）；离线方案和在线方案的提醒等待都会按此缩短，不再额外设半程提醒。</div>
+      <div class="hint">启用后整段离线收入 ×2（不是只翻后半程）；计划中的离线等待会按此倍率累计，在线等待的提醒也会按此缩短。</div>
       <div class="offline-row">
         <label for="offline-rate"><b>离线收益倍率</b></label>
         <input id="offline-rate" value="1" tabindex="-1" lang="en" inputmode="decimal" dir="ltr" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-describedby="offline-hint">
         <span class="hint">实测：总收益 ÷（时间 × 产出），例如 2.1</span>
       </div>
-      <div class="hint" id="offline-hint">提醒等待时间默认按此倍率提前；选择「离线攒钱」策略时，计划里的离线攒钱段也按该倍率累计。</div>
+      <div class="hint" id="offline-hint">提醒等待时间默认按此倍率提前；状态空间搜索会同时尝试在线等待和 3 分钟离线块，由搜索选择更短的时间。</div>
       <div class="hint" id="notify-hint"></div>
       <div class="vol-row">
         <label for="volume">蜂鸣音量</label>

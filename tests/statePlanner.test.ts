@@ -1,0 +1,135 @@
+import { describe, expect, it } from 'vitest';
+import { planStateSpace } from '../src/core/statePlanner.ts';
+
+function boneState() {
+  return {
+    resources: [
+      { id: 'blue', name: '蓝', emoji: '🔵', amount: 3.3e9, baseRate: 0 },
+      { id: 'red', name: '红', emoji: '🔴', amount: 1.22e10, baseRate: 0 },
+    ],
+    factories: [
+      {
+        id: 'heart',
+        label: '心脏',
+        price: 1.66e9,
+        unit: 199000,
+        growth: 1.15,
+        owned: 109,
+        outputResourceId: 'red',
+        costResourceId: 'blue',
+      },
+      {
+        id: 'brain',
+        label: '大脑',
+        price: 1.22e6,
+        unit: 81.9,
+        growth: 1.15,
+        owned: 38,
+        outputResourceId: 'blue',
+        costResourceId: 'red',
+      },
+      {
+        id: 'endocrine',
+        label: '内分泌系统',
+        price: 1.31e9,
+        unit: 15600,
+        growth: 1.15,
+        owned: 27,
+        outputResourceId: 'blue',
+        costResourceId: 'red',
+      },
+      {
+        id: 'bone',
+        label: '骨骼',
+        price: 4.86e10,
+        unit: 650000,
+        growth: 1.15,
+        owned: 3,
+        outputResourceId: 'blue',
+        costResourceId: 'red',
+      },
+    ],
+    upgrades: [
+      {
+        id: 'bone-up',
+        label: '骨头',
+        cost: 6e10,
+        costResourceId: 'blue',
+        targetFactoryId: 'bone',
+        multiplier: 6,
+        purchased: false,
+        requires: { type: 'factory', id: 'bone' },
+      },
+    ],
+    completedUpgrades: new Set(),
+    globalAdMultiplier: 4,
+  };
+}
+
+describe('state-space segment planner', () => {
+  it('buys bone factories before the bone upgrade when they reduce total time', () => {
+    const plan = planStateSpace(boneState(), 2, { adDoubling: true });
+    const upgradeIndex = plan.steps.findIndex((step) => step.type === 'upgrade');
+    const boneBuys = plan.steps.filter(
+      (step) => step.type === 'buy' && step.label === '骨骼',
+    );
+    expect(plan.goal).toBe('unlock');
+    expect(plan.strategy).toBe('search');
+    expect(boneBuys.length).toBeGreaterThan(0);
+    expect(plan.steps.indexOf(boneBuys[0])).toBeLessThan(upgradeIndex);
+    expect(plan.total).toBeLessThan(1620);
+  });
+
+  it('uses 3-minute offline blocks when they beat the exact online wait', () => {
+    const plan = planStateSpace(
+      {
+        resources: [{ id: 'r', name: '资源', amount: 0, baseRate: 10 }],
+        factories: [
+          {
+            id: 'f',
+            label: '工厂',
+            price: 1000,
+            unit: 0,
+            growth: 2,
+            owned: 1,
+            outputResourceId: 'r',
+            costResourceId: 'r',
+          },
+        ],
+        upgrades: [
+          {
+            id: 'u',
+            label: '升级',
+            cost: 10000,
+            costResourceId: 'r',
+            targetFactoryId: 'f',
+            multiplier: 2,
+            purchased: false,
+          },
+        ],
+        completedUpgrades: new Set(),
+      },
+      2,
+    );
+    expect(plan.steps[0].offline).toBe(true);
+    expect(plan.steps[0].t).toBe(540);
+    expect(plan.offlineBlocks).toBe(1);
+  });
+
+  it('does not mutate the input state', () => {
+    const state = boneState();
+    const before = JSON.stringify({
+      resources: state.resources,
+      factories: state.factories,
+      upgrades: state.upgrades,
+    });
+    planStateSpace(state, 2, { adDoubling: true });
+    expect(
+      JSON.stringify({
+        resources: state.resources,
+        factories: state.factories,
+        upgrades: state.upgrades,
+      }),
+    ).toBe(before);
+  });
+});

@@ -1,5 +1,5 @@
 export type NotationMode = 'short' | 'chinese' | 'scientific';
-export type PlanStrategy = 'online' | 'offline';
+export type PlanStrategy = 'search' | 'online' | 'offline';
 export type GlobalAdMultiplier = 1 | 2 | 4;
 
 export interface Requirement {

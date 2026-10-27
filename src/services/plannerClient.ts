@@ -1,5 +1,5 @@
-import { planExploration, planOfflineExploration } from '../core/planner.ts';
-import type { PlanResult, PlanStrategy, SimulationState } from '../types.ts';
+import { planStateSpace } from '../core/statePlanner.ts';
+import type { PlanResult, SimulationState } from '../types.ts';
 import PlannerWorker from './plannerWorker.ts?worker&inline';
 import type {
   PlannerWorkerRequest,
@@ -11,13 +11,11 @@ export type PlanComputation = PlanResult | Promise<PlanResult>;
 export interface PlannerClient {
   compute: (
     state: SimulationState,
-    strategy: PlanStrategy,
     offlineRate: number,
     adDoubling: boolean,
   ) => PlanComputation;
   computeSync: (
     state: SimulationState,
-    strategy: PlanStrategy,
     offlineRate: number,
     adDoubling: boolean,
   ) => PlanResult;
@@ -39,13 +37,10 @@ export function createPlannerClient(): PlannerClient {
 
   function computeSync(
     state: SimulationState,
-    strategy: PlanStrategy,
     offlineRate: number,
     adDoubling: boolean,
   ) {
-    return strategy === 'offline'
-      ? planOfflineExploration(state, offlineRate, { adDoubling })
-      : planExploration(state);
+    return planStateSpace(state, offlineRate, { adDoubling });
   }
 
   function ensureWorker(): Worker | null {
@@ -78,18 +73,16 @@ export function createPlannerClient(): PlannerClient {
 
   function compute(
     state: SimulationState,
-    strategy: PlanStrategy,
     offlineRate: number,
     adDoubling: boolean,
   ): PlanComputation {
     const instance = ensureWorker();
-    if (!instance) return computeSync(state, strategy, offlineRate, adDoubling);
+    if (!instance) return computeSync(state, offlineRate, adDoubling);
     const id = nextId;
     nextId += 1;
     const request: PlannerWorkerRequest = {
       id,
       state,
-      strategy,
       offlineRate,
       adDoubling,
     };
@@ -101,7 +94,7 @@ export function createPlannerClient(): PlannerClient {
         pending.delete(id);
         worker?.terminate();
         worker = null;
-        resolve(computeSync(state, strategy, offlineRate, adDoubling));
+        resolve(computeSync(state, offlineRate, adDoubling));
       }
     });
   }

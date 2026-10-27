@@ -212,7 +212,7 @@ describe('v6 boot', () => {
     expect(context.document.getElementById('result-body').classList.contains('hidden')).toBe(false);
     expect(context.document.getElementById('strategy').textContent).toContain('共买');
     expect(context.document.getElementById('strategy').textContent).toContain('升级1');
-    expect(context.document.getElementById('total-line').textContent).toContain('完成全部 1 个升级');
+    expect(context.document.getElementById('total-line').textContent).toContain('先买「升级1」');
     expect(context.document.getElementById('next-lbl').textContent).toContain('工厂1');
     const rows = context.document.querySelectorAll('#timeline tr');
     expect(rows.length).toBeGreaterThan(1);
@@ -266,11 +266,9 @@ describe('v6 boot', () => {
     });
     const context = boot(store);
     const strategy = context.document.getElementById('strategy').textContent;
-    expect(strategy).toContain('升级1 → 升级2 → 升级3');
-    expect(strategy).not.toContain('完成全部 3 个升级');
-    expect(context.document.getElementById('total-line').textContent).toContain(
-      '完成全部 3 个升级',
-    );
+    expect(strategy).toContain('升级1');
+    expect(strategy).not.toContain('升级2');
+    expect(context.document.getElementById('total-line').textContent).toContain('先买「升级1」');
   });
 
   it('recomputes a saved plan created by an older planner version', () => {
@@ -344,7 +342,7 @@ describe('v6 boot', () => {
     expect(restored.total).toBe(first.total);
   });
 
-  it('switches between online and offline saving strategies', () => {
+  it('uses the state-space search strategy without an online/offline switch', () => {
     const context = boot(
       sampleStore({
         resources: [{ id: 'r1', emoji: '🌱', name: '资源1', amount: '0', baseRate: '1000' }],
@@ -375,25 +373,10 @@ describe('v6 boot', () => {
       { [SETTING_KEYS.offlineRate]: '2.1' },
     );
     const select = context.document.getElementById('plan-strategy');
-    select.value = 'offline';
-    select.dispatchEvent(new context.window.Event('change', { bubbles: true }));
-
-    const offline = savedStore(context);
-    expect(offline.plan.strategy).toBe('offline');
-    expect(offline.plan.offlineBlocks).toBeGreaterThan(0);
-    expect(offline.plan.steps.every((step) => step.offline)).toBe(true);
-    expect(context.document.getElementById('strategy').textContent).toContain('离线攒钱');
-    expect(context.document.querySelector('.offline-break td').textContent).toContain(
-      '离线收入广告 ×2',
-    );
-    expect(context.document.getElementById('next-lbl').textContent).toContain('先离线攒');
-    expect(context.window.localStorage.getItem(SETTING_KEYS.planStrategy)).toBe('offline');
-
-    select.value = 'online';
-    select.dispatchEvent(new context.window.Event('change', { bubbles: true }));
-    const online = savedStore(context);
-    expect(online.plan.strategy).toBe('online');
-    expect(online.plan.steps.some((step) => step.offline)).toBe(false);
+    expect(select.value).toBe('search');
+    const plan = savedStore(context);
+    expect(plan.plan.strategy).toBe('search');
+    expect(context.document.getElementById('strategy').textContent).toContain('按时间表');
   });
 
   it('ignores invalid factory rows and disables their quick-buy buttons', () => {
@@ -596,6 +579,7 @@ describe('manual purchases', () => {
       }),
     );
     click(context, '#upgrade-rows .upg-row button.primary');
+    vi.advanceTimersByTime(400);
     const store = savedStore(context);
     expect(store.upgrades).toHaveLength(0);
     expect(store.factories[0].unit).toBe('20');
@@ -805,7 +789,7 @@ describe('manual purchases', () => {
     expect(savedStore(context).resources[0].baseRate).toBe('90');
   });
 
-  it('keeps the remaining plan when the next planned upgrade is purchased early', () => {
+  it('automatically opens the next segment after completing the current one', () => {
     const context = boot(
       sampleStore({
         resources: [{ id: 'r1', emoji: '🌱', amount: '5000', baseRate: '0' }],
@@ -829,18 +813,15 @@ describe('manual purchases', () => {
         ],
       }),
     );
-    expect(savedStore(context).plan.steps.map((step) => step.type)).toEqual([
-      'upgrade',
-      'upgrade',
-    ]);
+    expect(savedStore(context).plan.steps.map((step) => step.type)).toEqual(['upgrade']);
 
     click(context, '#upgrade-rows .upg-row button.primary');
+    vi.advanceTimersByTime(400);
     const plan = savedStore(context).plan;
-    expect(plan.stepIndex).toBe(0);
-    expect(plan.steps).toHaveLength(1);
+    expect(plan.complete).toBe(false);
+    expect(plan.steps.map((step) => step.type)).toEqual(['upgrade']);
     expect(savedStore(context).factories[0].unit).toBe('20');
     expect(context.document.querySelectorAll('#upgrade-rows .upg-row')).toHaveLength(1);
-    expect(context.document.getElementById('next-lbl').textContent).toContain('升级2');
   });
 
   it('uses the offline rate only for the reminder wait, not the next-action time', () => {
@@ -902,15 +883,11 @@ describe('manual purchases', () => {
       half.checked = false;
       half.dispatchEvent(new context.window.Event('change', { bubbles: true }));
     }
-    const select = context.document.getElementById('plan-strategy');
-    select.value = 'offline';
-    select.dispatchEvent(new context.window.Event('change', { bubbles: true }));
-
     const plan = savedStore(context).plan;
-    expect(plan.strategy).toBe('offline');
+    expect(plan.strategy).toBe('search');
     const seconds = plan.steps[0].t;
     click(context, '#arm-btn');
-    expect(savedStore(context).reminder.durMs).toBeCloseTo(seconds * 1000, 0);
+    expect(savedStore(context).reminder.durMs).toBeCloseTo((seconds * 1000) / 2.1, 0);
   });
 
   it('sets the ad-boosted offline reminder at the full offline wait', () => {
@@ -946,17 +923,17 @@ describe('manual purchases', () => {
     const half = context.document.getElementById('half-cb');
     half.checked = true;
     half.dispatchEvent(new context.window.Event('change', { bubbles: true }));
-    const select = context.document.getElementById('plan-strategy');
-    select.value = 'offline';
-    select.dispatchEvent(new context.window.Event('change', { bubbles: true }));
 
     const plan = savedStore(context).plan;
     expect(plan.adDoubled).toBe(true);
-    const wait = plan.steps[0].offlineWait;
+    const wait = plan.steps[0].t;
     click(context, '#arm-btn');
     const reminder = savedStore(context).reminder;
     expect(reminder.kind).toBe('full');
-    expect(reminder.durMs).toBeCloseTo(wait * 1000, 0);
+    expect(reminder.durMs).toBeCloseTo(
+      plan.steps[0].offline ? wait * 1000 : (wait * 1000) / (2.1 * 2),
+      0,
+    );
   });
 
   it('does not shorten or reset the current plan when the offline rate is changed', () => {
@@ -987,13 +964,12 @@ describe('new factory goal', () => {
     });
     const context = boot(store);
 
-    expect(context.document.getElementById('strategy').textContent).toContain('点出第一个新工厂');
+    expect(context.document.getElementById('strategy').textContent).toContain('工厂2');
     expect(context.document.getElementById('strategy').textContent).not.toContain('未找到');
     click(context, '#factory-rows .fac-row:nth-child(2) .fac-buy[data-count="1"]');
     vi.advanceTimersByTime(400);
     const saved = savedStore(context);
     expect(saved.factories[1].owned).toBe('1');
-    expect(context.document.getElementById('total-line').textContent).toContain('完成全部 1 个升级');
   });
 
   it('locks the new factory upgrade until its first unit is bought', () => {
@@ -1206,7 +1182,7 @@ describe('reminders', () => {
 
     const second = boot(saved);
     expect(second.document.getElementById('result-body').classList.contains('hidden')).toBe(false);
-    expect(second.document.getElementById('total-line').textContent).toContain('完成全部 1 个升级');
+    expect(second.document.getElementById('total-line').textContent).toContain('先买「升级1」');
     expect(second.document.getElementById('timeline').children.length).toBe(
       saved.plan.steps.length,
     );

@@ -17,7 +17,7 @@ function stepCost(step) {
 export function planSummary(plan) {
   if (!plan.steps.length) return '✅ 没有待完成的升级';
   const lead =
-    plan.strategy === 'offline' && (plan.offlineBlocks ?? 0) > 0
+    (plan.offlineBlocks ?? 0) > 0
       ? `🏕️ 离线攒钱（${plan.offlineBlocks} 段）：`
       : '';
 
@@ -88,6 +88,7 @@ export function planSummary(plan) {
 
 export function planGoalText(plan) {
   if (plan.complete !== false) return plan.goalLabel;
+  if (plan.goal === 'unlock') return plan.goalLabel;
   const next = plan.steps?.[plan.stepIndex ?? 0] ?? plan.steps?.[0];
   if (!next) return '完成当前段后重新规划';
   return next.type === 'buy'
@@ -259,7 +260,7 @@ export function createPlanView({ document }) {
         ? `当前段预计 ${fmtDur(plan.total)}，完成后重新规划`
         : '当前段可立即执行，完成后重新规划';
     const mode =
-      plan.strategy === 'offline' && (plan.offlineBlocks ?? 0) > 0
+      (plan.offlineBlocks ?? 0) > 0
         ? ` · 🏕️ ${plan.offlineBlocks} 段离线攒钱（在线等待 ${fmtDur(plan.onlineTime ?? 0)}，段内回到游戏后连续购买）` +
           (plan.adDoubled ? '，含离线收入广告 ×2' : '') +
           (plan.baselineTotal > plan.total + 0.5

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planSummary } from '../src/ui/planView.ts';
+import { planGoalText, planSummary } from '../src/ui/planView.ts';
 
 function step(type, label, extra = {}) {
   return { type, label, ...extra };
@@ -79,5 +79,34 @@ describe('planSummary', () => {
     expect(summary).toContain('首步：升级1');
     expect(summary).toContain('末步：升级20');
     expect(summary.length).toBeLessThan(150);
+  });
+});
+
+describe('planGoalText', () => {
+  it('describes an incomplete plan as the next gate instead of the full goal', () => {
+    expect(
+      planGoalText({
+        complete: false,
+        goalLabel: '完成全部 37 个升级',
+        steps: [step('upgrade', '枕叶')],
+      }),
+    ).toBe('先买「枕叶」');
+    expect(
+      planGoalText({
+        complete: false,
+        goalLabel: '完成全部 37 个升级',
+        steps: [step('buy', '内分泌系统', { nth: 1 })],
+      }),
+    ).toBe('先买出「内分泌系统」首台');
+  });
+
+  it('keeps the declared goal for complete plans', () => {
+    expect(
+      planGoalText({
+        complete: true,
+        goalLabel: '完成全部 2 个升级',
+        steps: [],
+      }),
+    ).toBe('完成全部 2 个升级');
   });
 });

@@ -86,6 +86,15 @@ export function planSummary(plan) {
   return `${lead}🚀 共买 ${buyCount} 台工厂、${upgradeCount} 个升级，顺序：${orderText}`;
 }
 
+export function planGoalText(plan) {
+  if (plan.complete !== false) return plan.goalLabel;
+  const next = plan.steps?.[plan.stepIndex ?? 0] ?? plan.steps?.[0];
+  if (!next) return '完成当前段后重新规划';
+  return next.type === 'buy'
+    ? `先买出「${next.label}」首台`
+    : `先买「${next.label}」`;
+}
+
 /**
  * v5 结果面板：目标、下次行动、总时长、时间表。
  */
@@ -214,9 +223,6 @@ export function createPlanView({ document }) {
     nextClock.textContent = `${fmtClock(due)}${remaining <= 0 ? ' · 现在就可以买' : ''}`;
   }
 
-  /**
-   * @param {{ plan: any, now?: number }} options
-   */
   function render({ plan, now = Date.now() }) {
     if (!plan || plan.steps.length === 0 && plan.complete === false) {
       reset();
@@ -230,10 +236,11 @@ export function createPlanView({ document }) {
 
     strategy.textContent = planSummary(plan);
     if (plan.complete === false) {
-      strategy.textContent += '（未找到完整方案，先检查资源产出和价格）';
-      strategy.classList.add('err');
-    } else {
+      strategy.textContent += '（先执行当前段，完成后重新规划）';
       strategy.classList.remove('err');
+      strategy.classList.add('warn-hint');
+    } else {
+      strategy.classList.remove('err', 'warn-hint');
     }
 
     if (plan.complete && plan.steps.length === 0) {
@@ -248,7 +255,9 @@ export function createPlanView({ document }) {
 
     const total = plan.complete
       ? `全程预计 ${fmtDur(plan.total)}（${fmtClock(plan.anchor + plan.total * 1000)} 完成）`
-      : `已推进 ${fmtDur(plan.total)}，目标未完成`;
+      : plan.total > 0
+        ? `当前段预计 ${fmtDur(plan.total)}，完成后重新规划`
+        : '当前段可立即执行，完成后重新规划';
     const mode =
       plan.strategy === 'offline' && (plan.offlineBlocks ?? 0) > 0
         ? ` · 🏕️ ${plan.offlineBlocks} 段离线攒钱（在线等待 ${fmtDur(plan.onlineTime ?? 0)}，段内回到游戏后连续购买）` +
@@ -257,7 +266,7 @@ export function createPlanView({ document }) {
             ? `，比在线方案快 ${fmtDur(plan.baselineTotal - plan.total)}`
             : '')
         : '';
-    totalLine.textContent = `目标：${plan.goalLabel} · ${total}${mode}`;
+    totalLine.textContent = `目标：${planGoalText(plan)} · ${total}${mode}`;
     updateCountdown(now);
     renderTimeline();
   }

@@ -63,11 +63,13 @@ describe('life anatomy preset', () => {
     expect(store.upgrades.filter((upgrade) => upgrade.name === '软骨')).toHaveLength(1);
     expect(store.upgrades.some((upgrade) => upgrade.name === '软骨（肌肉）')).toBe(false);
     const tendon = store.upgrades.find((upgrade) => upgrade.name === '肌腱');
+    const boneMuscle = store.upgrades.find((upgrade) => upgrade.name === '骨骼肌肉');
     expect(tendon).toMatchObject({
       cost: '800T',
       multiplier: '31',
       targetFactoryId: findFactory(store, '肌肉').id,
     });
+    expect(tendon.requires).toEqual({ type: 'upgrade', id: boneMuscle.id });
     expect(findFactory(store, '心脏').requires).toBeNull();
     expect(findFactory(store, '肌肉')).toMatchObject({ unit: '10.0M' });
     const skinUpgrades = ['甲状腺', '皮下组织', '表皮层', '真皮层', '松果体'];

@@ -543,7 +543,7 @@ export function planStateSpace(
 
   const start = clone(input);
   const maxOwned = new Map(
-    input.factories.map((factory) => [factory.id, factory.owned + 500]),
+    input.factories.map((factory) => [factory.id, factory.owned + 1000]),
   );
   const heap = createHeap();
   const frontiers = new Map<string, { time: number; amounts: number[] }[]>();

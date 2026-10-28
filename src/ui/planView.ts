@@ -95,10 +95,6 @@ function groupCostText(steps) {
     .join(' + ');
 }
 
-function groupResourceText(steps) {
-  return [...new Set(steps.map((step) => resourceText(step)))].join(' / ');
-}
-
 export function planSummary(plan) {
   if (!plan.steps.length) return '✅ 没有待完成的升级';
   const lead =
@@ -243,7 +239,7 @@ export function createPlanView({ document }) {
         const breakRow = document.createElement('tr');
         breakRow.classList.add('offline-break');
         const cell = document.createElement('td');
-        cell.colSpan = 6;
+        cell.colSpan = 5;
         cell.textContent =
           `🏕️ 离线 ${fmtDur(first.offlineWait ?? 0)}` +
           `${currentPlan.adDoubled ? '（离线收入广告 ×2）' : ''}` +
@@ -265,7 +261,6 @@ export function createPlanView({ document }) {
         String(rowIndex + 1),
         groupActionText(group.steps),
         groupCostText(group.steps),
-        groupResourceText(group.steps),
         fmtDur(first.t),
         fmtClock(currentPlan.anchor + first.t * 1000),
       ];

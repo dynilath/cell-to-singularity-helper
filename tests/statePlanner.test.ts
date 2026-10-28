@@ -208,7 +208,11 @@ describe('state-space segment planner', () => {
       },
       2,
     );
-    expect(plan.steps[0]).toMatchObject({ type: 'upgrade', upgradeId: 'marrow' });
+    expect(
+      plan.steps.some(
+        (step) => step.type === 'upgrade' && step.upgradeId === 'marrow',
+      ),
+    ).toBe(true);
   });
 
   it('includes an intermediate factory that funds a target-resource factory', () => {

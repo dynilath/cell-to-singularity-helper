@@ -445,9 +445,434 @@ function collectSegmentActions(state: State, target: Target) {
   return { factoryIds, upgradeIds };
 }
 
+function targetActionOf(state: State, target: Target) {
+  if (target.kind === 'upgrade') {
+    const upgrade = state.upgrades.find((item) => item.id === target.id);
+    if (!upgrade) return null;
+    return {
+      kind: 'upgrade' as const,
+      id: upgrade.id,
+      label: upgrade.label,
+      cost: upgrade.cost,
+      resourceId: upgrade.costResourceId,
+    };
+  }
+  const factory = state.factories.find((item) => item.id === target.id);
+  if (!factory) return null;
+  return {
+    kind: 'factory' as const,
+    id: factory.id,
+    label: factory.label,
+    cost: factory.price,
+    resourceId: factory.costResourceId,
+  };
+}
+
+/**
+ * 先构造一个“把当前买得起的相关工厂先买掉”的种子路径。
+ * 主搜索仍会继续找更优路径，但至少不会因为节点预算耗尽而漏掉
+ * “先补肌肉再等耳朵/软骨”这种工厂投资。
+ */
+function buildSeedPath(
+  start: State,
+  target: Target,
+  offlineMultiplier: number,
+): SearchNode | null {
+  const state = clone(start);
+  const steps: PlanStep[] = [];
+  const time = 0;
+  let offlineBlocks = 0;
+  let onlineTime = 0;
+  let offlineTime = 0;
+
+  const targetWaitSeconds = (candidate: State) => {
+    if (targetReached(candidate, target)) return 0;
+    const action = targetActionOf(candidate, target);
+    if (!action) return Number.POSITIVE_INFINITY;
+    const waits = waitForItem(
+      candidate,
+      ratesOf(candidate),
+      action.resourceId,
+      action.cost,
+      offlineMultiplier,
+    );
+    if (!waits) return Number.POSITIVE_INFINITY;
+    return Math.min(
+      waits.online.seconds,
+      waits.offline?.seconds ?? Number.POSITIVE_INFINITY,
+    );
+  };
+
+  let current = targetWaitSeconds(state);
+  if (!Number.isFinite(current)) return null;
+  for (let purchase = 0; purchase < 40; purchase += 1) {
+    const { factoryIds } = collectSegmentActions(state, target);
+    let best: { factoryId: string; wait: number } | null = null;
+    for (const factoryId of factoryIds) {
+      const factory = state.factories.find((item) => item.id === factoryId);
+      if (!factory || !factoryActionable(state, factory)) continue;
+      if (factory.price <= 0 || factory.unit <= 0 || factory.growth <= 0) continue;
+      if (amountOf(state, factory.costResourceId) < factory.price - 1e-9) continue;
+      const trial = clone(state);
+      if (!buyFactory(trial, factoryId)) continue;
+      const wait = targetWaitSeconds(trial);
+      if (wait < current - 1e-9 && (!best || wait < best.wait)) {
+        best = { factoryId, wait };
+      }
+    }
+    if (!best) break;
+    const factory = state.factories.find((item) => item.id === best.factoryId);
+    if (!factory) break;
+    const price = factory.price;
+    if (!buyFactory(state, factory.id)) break;
+    steps.push({
+      type: 'buy',
+      factoryId: factory.id,
+      label: factory.label,
+      nth: factory.owned,
+      price,
+      resourceId: factory.costResourceId,
+      resourceName:
+        state.resources.find((item) => item.id === factory.costResourceId)?.emoji ??
+        '资源',
+      t: time,
+    });
+    current = best.wait;
+  }
+
+  if (targetReached(state, target)) {
+    return {
+      state,
+      time,
+      f: time,
+      steps,
+      offlineBlocks,
+      onlineTime,
+      offlineTime,
+    };
+  }
+
+  const action = targetActionOf(state, target);
+  if (!action) return null;
+  const rates = ratesOf(state);
+  const waits = waitForItem(
+    state,
+    rates,
+    action.resourceId,
+    action.cost,
+    offlineMultiplier,
+  );
+  if (!waits) return null;
+  const wait =
+    waits.offline && waits.offline.seconds < waits.online.seconds
+      ? waits.offline
+      : waits.online;
+  advance(state, rates, wait.seconds, wait.offline ? offlineMultiplier : 1);
+  if (action.kind === 'factory') {
+    if (!buyFactory(state, action.id)) return null;
+  } else if (!buyUpgrade(state, action.id)) {
+    return null;
+  }
+  const total = time + wait.seconds;
+  const block = offlineBlocks + (wait.offline ? 1 : 0);
+  const resourceName =
+    state.resources.find((item) => item.id === action.resourceId)?.emoji ?? '资源';
+  steps.push(
+    action.kind === 'factory'
+      ? {
+          type: 'buy',
+          factoryId: action.id,
+          label: action.label,
+          nth: state.factories.find((item) => item.id === action.id)?.owned ?? 1,
+          price: action.cost,
+          resourceId: action.resourceId,
+          resourceName,
+          t: total,
+          offline: wait.offline,
+          offlineBlock: wait.offline ? block : 0,
+          offlineWait: wait.seconds,
+        }
+      : {
+          type: 'upgrade',
+          upgradeId: action.id,
+          label: action.label,
+          cost: action.cost,
+          resourceId: action.resourceId,
+          resourceName,
+          t: total,
+          offline: wait.offline,
+          offlineBlock: wait.offline ? block : 0,
+          offlineWait: wait.seconds,
+        },
+  );
+  if (wait.offline) {
+    offlineBlocks = block;
+    offlineTime += wait.seconds;
+  } else {
+    onlineTime += wait.seconds;
+  }
+  return {
+    state,
+    time: total,
+    f: total,
+    steps,
+    offlineBlocks,
+    onlineTime,
+    offlineTime,
+  };
+}
+
+/**
+ * 贪心种子：每一步都选“执行后到目标剩余等待最短”的动作。
+ * 不保证最优，但能在主搜索预算耗尽前提供包含工厂投资的可行解。
+ */
+/**
+ * 把当前买得起、且直接生产目标资源的工厂先买掉。
+ * 作为递归规划的安全种子，避免主搜索在节点预算内漏掉“先补肌肉再等软骨”。
+ */
+function buildPrebuyState(start: State, target: Target) {
+  const state = clone(start);
+  const targetAction = targetActionOf(state, target);
+  if (!targetAction) return null;
+  const steps: PlanStep[] = [];
+  for (let round = 0; round < 20; round += 1) {
+    const { factoryIds } = collectSegmentActions(state, target);
+    let changed = false;
+    for (const factoryId of factoryIds) {
+      const factory = state.factories.find((item) => item.id === factoryId);
+      if (!factory || !factoryActionable(state, factory)) continue;
+      const isTargetFactory = target.kind === 'factory' && target.id === factory.id;
+      if (
+        !isTargetFactory &&
+        factory.outputResourceId !== targetAction.resourceId
+      ) {
+        continue;
+      }
+      if (factory.price <= 0 || factory.unit <= 0 || factory.growth <= 0) continue;
+      if (amountOf(state, factory.costResourceId) < factory.price - 1e-9) continue;
+      const price = factory.price;
+      if (!buyFactory(state, factory.id)) continue;
+      steps.push({
+        type: 'buy',
+        factoryId: factory.id,
+        label: factory.label,
+        nth: factory.owned,
+        price,
+        resourceId: factory.costResourceId,
+        resourceName:
+          state.resources.find((item) => item.id === factory.costResourceId)?.emoji ??
+          '资源',
+        t: 0,
+      });
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return steps.length > 0 ? { state, steps } : null;
+}
+
+function buildGreedyPath(
+  start: State,
+  target: Target,
+  offlineMultiplier: number,
+): SearchNode | null {
+  const state = clone(start);
+  const steps: PlanStep[] = [];
+  let time = 0;
+  let offlineBlocks = 0;
+  let onlineTime = 0;
+  let offlineTime = 0;
+
+  const targetWaitSeconds = (candidate: State) => {
+    if (targetReached(candidate, target)) return 0;
+    const action = targetActionOf(candidate, target);
+    if (!action) return Number.POSITIVE_INFINITY;
+    const waits = waitForItem(
+      candidate,
+      ratesOf(candidate),
+      action.resourceId,
+      action.cost,
+      offlineMultiplier,
+    );
+    if (!waits) return Number.POSITIVE_INFINITY;
+    return Math.min(
+      waits.online.seconds,
+      waits.offline?.seconds ?? Number.POSITIVE_INFINITY,
+    );
+  };
+
+  for (let iteration = 0; iteration < 100; iteration += 1) {
+    if (iteration === 0) {
+      // 先把当前买得起、且能缩短目标剩余时间的工厂买掉。
+      // 这些工厂的成本资源不是目标资源，但会提高目标资源产出。
+      let current = targetWaitSeconds(state);
+      for (let purchase = 0; purchase < 40 && Number.isFinite(current); purchase += 1) {
+        const { factoryIds } = collectSegmentActions(state, target);
+        let best: { factoryId: string; wait: number } | null = null;
+        for (const factoryId of factoryIds) {
+          const factory = state.factories.find((item) => item.id === factoryId);
+          if (!factory || !factoryActionable(state, factory)) continue;
+          if (factory.price <= 0 || factory.unit <= 0 || factory.growth <= 0) continue;
+          if (amountOf(state, factory.costResourceId) < factory.price - 1e-9) continue;
+          const trial = clone(state);
+          if (!buyFactory(trial, factoryId)) continue;
+          const wait = targetWaitSeconds(trial);
+          if (wait < current - 1e-9 && (!best || wait < best.wait)) {
+            best = { factoryId, wait };
+          }
+        }
+        if (!best) break;
+        const factory = state.factories.find((item) => item.id === best.factoryId);
+        if (!factory) break;
+        const price = factory.price;
+        if (!buyFactory(state, factory.id)) break;
+        steps.push({
+          type: 'buy',
+          factoryId: factory.id,
+          label: factory.label,
+          nth: factory.owned,
+          price,
+          resourceId: factory.costResourceId,
+          resourceName:
+            state.resources.find((item) => item.id === factory.costResourceId)?.emoji ??
+            '资源',
+          t: time,
+        });
+        current = best.wait;
+      }
+    }
+    if (targetReached(state, target)) {
+      return {
+        state,
+        time,
+        f: time,
+        steps,
+        offlineBlocks,
+        onlineTime,
+        offlineTime,
+      };
+    }
+    const { factoryIds, upgradeIds } = collectSegmentActions(state, target);
+    const actions: {
+      kind: TargetKind;
+      id: string;
+      label: string;
+      cost: number;
+      resourceId: string;
+    }[] = [];
+    for (const factoryId of factoryIds) {
+      const factory = state.factories.find((item) => item.id === factoryId);
+      if (!factory || !factoryActionable(state, factory)) continue;
+      actions.push({
+        kind: 'factory',
+        id: factory.id,
+        label: factory.label,
+        cost: factory.price,
+        resourceId: factory.costResourceId,
+      });
+    }
+    for (const upgradeId of upgradeIds) {
+      const upgrade = state.upgrades.find((item) => item.id === upgradeId);
+      if (!upgrade || upgrade.purchased || !upgradeActionable(state, upgrade)) continue;
+      actions.push({
+        kind: 'upgrade',
+        id: upgrade.id,
+        label: upgrade.label,
+        cost: upgrade.cost,
+        resourceId: upgrade.costResourceId,
+      });
+    }
+
+    let best:
+      | {
+          action: (typeof actions)[number];
+          wait: { seconds: number; offline: boolean };
+          score: number;
+          trial: State;
+        }
+      | null = null;
+    const rates = ratesOf(state);
+    for (const action of actions) {
+      const waits = waitForItem(
+        state,
+        rates,
+        action.resourceId,
+        action.cost,
+        offlineMultiplier,
+      );
+      if (!waits) continue;
+      const wait =
+        waits.offline && waits.offline.seconds < waits.online.seconds
+          ? waits.offline
+          : waits.online;
+      const trial = clone(state);
+      advance(trial, rates, wait.seconds, wait.offline ? offlineMultiplier : 1);
+      const bought =
+        action.kind === 'factory'
+          ? buyFactory(trial, action.id)
+          : buyUpgrade(trial, action.id);
+      if (!bought) continue;
+      const remaining = targetWaitSeconds(trial);
+      if (!Number.isFinite(remaining)) continue;
+      const score = time + wait.seconds + remaining;
+      if (!best || score < best.score - 1e-9) {
+        best = { action, wait, score, trial };
+      }
+    }
+    if (!best) break;
+    const before = state.factories.find((item) => item.id === best.action.id);
+    const beforePrice = before?.price ?? best.action.cost;
+    const next = best.trial;
+    const block = offlineBlocks + (best.wait.offline ? 1 : 0);
+    const nextTime = time + best.wait.seconds;
+    const resourceName =
+      next.resources.find((item) => item.id === best.action.resourceId)?.emoji ?? '资源';
+    if (best.action.kind === 'factory') {
+      const factory = next.factories.find((item) => item.id === best.action.id);
+      if (!factory) break;
+      steps.push({
+        type: 'buy',
+        factoryId: factory.id,
+        label: factory.label,
+        nth: factory.owned,
+        price: beforePrice,
+        resourceId: factory.costResourceId,
+        resourceName,
+        t: nextTime,
+        offline: best.wait.offline,
+        offlineBlock: best.wait.offline ? block : 0,
+        offlineWait: best.wait.seconds,
+      });
+    } else {
+      const upgrade = next.upgrades.find((item) => item.id === best.action.id);
+      steps.push({
+        type: 'upgrade',
+        upgradeId: best.action.id,
+        label: best.action.label,
+        cost: best.action.cost,
+        resourceId: best.action.resourceId,
+        resourceName,
+        t: nextTime,
+        offline: best.wait.offline,
+        offlineBlock: best.wait.offline ? block : 0,
+        offlineWait: best.wait.seconds,
+      });
+      void upgrade;
+    }
+    state.resources = next.resources;
+    state.factories = next.factories;
+    state.upgrades = next.upgrades;
+    state.completedUpgrades = next.completedUpgrades;
+    time = nextTime;
+    offlineBlocks = block;
+    if (best.wait.offline) offlineTime += best.wait.seconds;
+    else onlineTime += best.wait.seconds;
+  }
+  return null;
+}
+
 function targetLabel(target: Target) {
-  if (target.kind === 'upgrade') return `先买「${target.label}」`;
-  return target.requiredOwned > 1
+  if (target.kind === 'upgrade') return `先买「${target.label}」`;  return target.requiredOwned > 1
     ? `先把「${target.label}」补到 ${target.requiredOwned} 台`
     : `先买出「${target.label}」首台`;
 }
@@ -459,12 +884,16 @@ function targetLabel(target: Target) {
 export function planStateSpace(
   input: State,
   offlineRate = 1,
-  options: { adDoubling?: boolean } = {},
+  options: {
+    adDoubling?: boolean;
+    targetOverride?: Target;
+    skipPrebuy?: boolean;
+  } = {},
 ): PlanResult {
   const offlineMultiplier =
     (Number.isFinite(offlineRate) && offlineRate > 0 ? offlineRate : 1) *
     (options.adDoubling ? 2 : 1);
-  const target = nextTarget(input);
+  const target = options.targetOverride ?? nextTarget(input);
   if (!target) {
     return {
       steps: [],
@@ -482,13 +911,36 @@ export function planStateSpace(
   }
 
   const start = clone(input);
+  if (!options.skipPrebuy) {
+    const prebuy = buildPrebuyState(start, target);
+    if (prebuy) {
+      const rest = planStateSpace(prebuy.state, offlineRate, {
+        ...options,
+        skipPrebuy: true,
+        targetOverride: target,
+      });
+      if (rest.steps.length > 0 || rest.complete) {
+        return {
+          ...rest,
+          steps: [...prebuy.steps, ...rest.steps],
+        };
+      }
+    }
+  }
   const maxOwned = new Map(
     input.factories.map((factory) => [factory.id, factory.owned + 30]),
   );
   const heap = createHeap();
   const frontiers = new Map<string, { time: number; amounts: number[] }[]>();
   const heuristic = targetHeuristic(start, target, offlineMultiplier);
-  let bestTarget: SearchNode | null = null;
+  const seed = buildSeedPath(start, target, offlineMultiplier);
+  const greedySeed = buildGreedyPath(start, target, offlineMultiplier);
+  let bestTarget: SearchNode | null =
+    seed && greedySeed
+      ? seed.time <= greedySeed.time
+        ? seed
+        : greedySeed
+      : seed ?? greedySeed;
   heap.push({
     state: start,
     time: 0,

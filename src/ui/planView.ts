@@ -40,26 +40,38 @@ export function groupPlanSteps(steps) {
   return groups;
 }
 
-function groupActionText(steps) {
+export function groupActionText(steps) {
   if (steps.length === 1) return actionText(steps[0]);
-  const counts = new Map();
-  for (const step of steps) {
-    const key = `${step.type}:${step.label}`;
-    const entry = counts.get(key);
-    if (entry) entry.count += 1;
-    else counts.set(key, { label: step.label, count: 1, type: step.type });
+  const lines = [];
+  let index = 0;
+  while (index < steps.length) {
+    const step = steps[index];
+    if (step.type === 'upgrade') {
+      lines.push(`购买 ${step.label}`);
+      index += 1;
+      continue;
+    }
+    const label = step.label;
+    const nths = [];
+    while (
+      index < steps.length &&
+      steps[index].type === 'buy' &&
+      steps[index].label === label
+    ) {
+      nths.push(Number(steps[index].nth));
+      index += 1;
+    }
+    const first = nths[0];
+    const last = nths[nths.length - 1];
+    if (nths.length > 1 && last - first + 1 === nths.length) {
+      lines.push(`购买 ${label} 第 ${first} ~ ${last} 台`);
+    } else if (nths.length > 1) {
+      lines.push(`购买 ${label} 第 ${nths.join('、')} 台`);
+    } else {
+      lines.push(`购买 ${label} 第 ${first} 台`);
+    }
   }
-  const entries = [...counts.values()];
-  if (entries.length === 1 && entries[0].type === 'buy') {
-    return `买 ${entries[0].label} ×${entries[0].count}`;
-  }
-  const parts = entries
-    .slice(0, 3)
-    .map((entry) =>
-      entry.count > 1 ? `${entry.label}×${entry.count}` : entry.label,
-    );
-  const suffix = entries.length > 3 ? ` 等 ${entries.length} 项` : '';
-  return `立即购买 ${steps.length} 项：${parts.join('、')}${suffix}`;
+  return lines.join('\n');
 }
 
 function groupCostText(steps) {
@@ -217,10 +229,7 @@ export function createPlanView({ document }) {
           (step) => step.offlineBlock === first.offlineBlock,
         );
         const names = blockSteps.map((item) => item.label);
-        const nameText =
-          names.length <= 3
-            ? names.join('、')
-            : `${names.slice(0, 3).join('、')} 等 ${names.length} 个`;
+        const nameText = names.join('、');
         const breakRow = document.createElement('tr');
         breakRow.classList.add('offline-break');
         const cell = document.createElement('td');
@@ -250,8 +259,11 @@ export function createPlanView({ document }) {
         fmtDur(first.t),
         fmtClock(currentPlan.anchor + first.t * 1000),
       ];
-      for (const value of cells) {
+      for (const [cellIndex, value] of cells.entries()) {
         const cell = document.createElement('td');
+        if (cellIndex === 1) {
+          cell.classList.add('act', 'timeline-action');
+        }
         cell.textContent = value;
         row.append(cell);
       }

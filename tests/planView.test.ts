@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { groupPlanSteps, planGoalText, planSummary } from '../src/ui/planView.ts';
+import {
+  groupActionText,
+  groupPlanSteps,
+  planGoalText,
+  planSummary,
+} from '../src/ui/planView.ts';
 
 function step(type, label, extra = {}) {
   return { type, label, ...extra };
@@ -97,6 +102,25 @@ describe('groupPlanSteps', () => {
     expect(groups[0].indices).toEqual([0, 1, 2, 3, 4]);
     expect(groups[1].steps).toHaveLength(1);
     expect(groups[1].t).toBe(180);
+  });
+
+  it('shows every merged factory range instead of truncating with 等N项', () => {
+    expect(
+      groupActionText([
+        { type: 'buy', label: '骨骼', nth: 8, t: 0 },
+        { type: 'buy', label: '骨骼', nth: 9, t: 0 },
+        { type: 'buy', label: '骨骼', nth: 10, t: 0 },
+        { type: 'buy', label: '大脑', nth: 39, t: 0 },
+        { type: 'buy', label: '大脑', nth: 40, t: 0 },
+        { type: 'buy', label: '肌肉', nth: 4, t: 0 },
+        { type: 'upgrade', label: '骨头', t: 0 },
+      ]),
+    ).toBe(
+      '购买 骨骼 第 8 ~ 10 台\n' +
+        '购买 大脑 第 39 ~ 40 台\n' +
+        '购买 肌肉 第 4 台\n' +
+        '购买 骨头',
+    );
   });
 
   it('does not merge across different timestamps or offline blocks', () => {

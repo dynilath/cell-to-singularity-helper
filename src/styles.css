@@ -440,6 +440,12 @@ td.act {
   text-align: left;
 }
 
+td.timeline-action {
+  white-space: pre-line;
+  min-width: 210px;
+  line-height: 1.55;
+}
+
 td.num {
   font-family: var(--mono);
 }

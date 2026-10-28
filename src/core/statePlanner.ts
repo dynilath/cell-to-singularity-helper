@@ -630,11 +630,32 @@ function buildSeedPath(
  * 把当前买得起、且直接生产目标资源的工厂先买掉。
  * 作为递归规划的安全种子，避免主搜索在节点预算内漏掉“先补肌肉再等软骨”。
  */
-function buildPrebuyState(start: State, target: Target) {
+function buildPrebuyState(
+  start: State,
+  target: Target,
+  offlineMultiplier: number,
+) {
   const state = clone(start);
   const targetAction = targetActionOf(state, target);
   if (!targetAction) return null;
   const steps: PlanStep[] = [];
+  const targetWaitSeconds = (candidate: State) => {
+    if (targetReached(candidate, target)) return 0;
+    const action = targetActionOf(candidate, target);
+    if (!action) return Number.POSITIVE_INFINITY;
+    const waits = waitForItem(
+      candidate,
+      ratesOf(candidate),
+      action.resourceId,
+      action.cost,
+      offlineMultiplier,
+    );
+    if (!waits) return Number.POSITIVE_INFINITY;
+    return Math.min(
+      waits.online.seconds,
+      waits.offline?.seconds ?? Number.POSITIVE_INFINITY,
+    );
+  };
   for (let round = 0; round < 20; round += 1) {
     const { factoryIds } = collectSegmentActions(state, target);
     let changed = false;
@@ -668,6 +689,43 @@ function buildPrebuyState(start: State, target: Target) {
     }
     if (!changed) break;
   }
+
+  let current = targetWaitSeconds(state);
+  for (let round = 0; round < 20 && Number.isFinite(current); round += 1) {
+    const { upgradeIds } = collectSegmentActions(state, target);
+    let best: { upgradeId: string; wait: number } | null = null;
+    for (const upgradeId of upgradeIds) {
+      const upgrade = state.upgrades.find((item) => item.id === upgradeId);
+      if (!upgrade || upgrade.purchased || !upgradeActionable(state, upgrade)) {
+        continue;
+      }
+      if (amountOf(state, upgrade.costResourceId) < upgrade.cost - 1e-9) continue;
+      const trial = clone(state);
+      if (!buyUpgrade(trial, upgradeId)) continue;
+      const wait = targetWaitSeconds(trial);
+      if (wait < current - 1e-9 && (!best || wait < best.wait)) {
+        best = { upgradeId, wait };
+      }
+    }
+    if (!best) break;
+    const upgrade = state.upgrades.find((item) => item.id === best.upgradeId);
+    if (!upgrade) break;
+    const cost = upgrade.cost;
+    const resourceId = upgrade.costResourceId;
+    if (!buyUpgrade(state, upgrade.id)) break;
+    steps.push({
+      type: 'upgrade',
+      upgradeId: upgrade.id,
+      label: upgrade.label,
+      cost,
+      resourceId,
+      resourceName:
+        state.resources.find((item) => item.id === resourceId)?.emoji ?? '资源',
+      t: 0,
+    });
+    current = best.wait;
+  }
+
   return steps.length > 0 ? { state, steps } : null;
 }
 
@@ -912,7 +970,7 @@ export function planStateSpace(
 
   const start = clone(input);
   if (!options.skipPrebuy) {
-    const prebuy = buildPrebuyState(start, target);
+    const prebuy = buildPrebuyState(start, target, offlineMultiplier);
     if (prebuy) {
       const rest = planStateSpace(prebuy.state, offlineRate, {
         ...options,

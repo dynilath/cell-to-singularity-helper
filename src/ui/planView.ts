@@ -42,34 +42,44 @@ export function groupPlanSteps(steps) {
 
 export function groupActionText(steps) {
   if (steps.length === 1) return actionText(steps[0]);
+  const entries = new Map<
+    string,
+    { type: 'buy' | 'upgrade'; label: string; nths: number[] }
+  >();
+  for (const step of steps) {
+    const key = `${step.type}:${step.label}`;
+    let entry = entries.get(key);
+    if (!entry) {
+      entry =
+        step.type === 'upgrade'
+          ? { type: 'upgrade', label: step.label, nths: [] }
+          : { type: 'buy', label: step.label, nths: [] };
+      entries.set(key, entry);
+    }
+    if (step.type === 'buy') entry.nths.push(Number(step.nth));
+  }
+
   const lines = [];
-  let index = 0;
-  while (index < steps.length) {
-    const step = steps[index];
-    if (step.type === 'upgrade') {
-      lines.push(`购买 ${step.label}`);
-      index += 1;
+  for (const entry of entries.values()) {
+    if (entry.type === 'upgrade') {
+      lines.push(`购买 ${entry.label}`);
       continue;
     }
-    const label = step.label;
-    const nths = [];
-    while (
-      index < steps.length &&
-      steps[index].type === 'buy' &&
-      steps[index].label === label
-    ) {
-      nths.push(Number(steps[index].nth));
-      index += 1;
+    const nths = [...new Set(entry.nths)].sort((left, right) => left - right);
+    const ranges: { start: number; end: number }[] = [];
+    for (const nth of nths) {
+      const last = ranges[ranges.length - 1];
+      if (last && nth === last.end + 1) last.end = nth;
+      else ranges.push({ start: nth, end: nth });
     }
-    const first = nths[0];
-    const last = nths[nths.length - 1];
-    if (nths.length > 1 && last - first + 1 === nths.length) {
-      lines.push(`购买 ${label} 第 ${first} ~ ${last} 台`);
-    } else if (nths.length > 1) {
-      lines.push(`购买 ${label} 第 ${nths.join('、')} 台`);
-    } else {
-      lines.push(`购买 ${label} 第 ${first} 台`);
-    }
+    const rangeText = ranges
+      .map((range) =>
+        range.start === range.end
+          ? `${range.start}`
+          : `${range.start} ~ ${range.end}`,
+      )
+      .join('、');
+    lines.push(`购买 ${entry.label} 第 ${rangeText} 台`);
   }
   return lines.join('\n');
 }

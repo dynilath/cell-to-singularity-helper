@@ -123,6 +123,25 @@ describe('groupPlanSteps', () => {
     );
   });
 
+  it('merges interleaved buys of the same factory into one range', () => {
+    expect(
+      groupActionText([
+        { type: 'buy', label: '骨骼', nth: 10, t: 0 },
+        { type: 'buy', label: '大脑', nth: 39, t: 0 },
+        { type: 'buy', label: '内分泌系统', nth: 28, t: 0 },
+        { type: 'buy', label: '肌肉', nth: 6, t: 0 },
+        { type: 'buy', label: '骨骼', nth: 11, t: 0 },
+        { type: 'buy', label: '大脑', nth: 40, t: 0 },
+        { type: 'buy', label: '内分泌系统', nth: 29, t: 0 },
+      ]),
+    ).toBe(
+      '购买 骨骼 第 10 ~ 11 台\n' +
+        '购买 大脑 第 39 ~ 40 台\n' +
+        '购买 内分泌系统 第 28 ~ 29 台\n' +
+        '购买 肌肉 第 6 台',
+    );
+  });
+
   it('does not merge across different timestamps or offline blocks', () => {
     const groups = groupPlanSteps([
       { type: 'buy', label: '心脏', t: 0 },

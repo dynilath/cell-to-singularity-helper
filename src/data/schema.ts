@@ -39,7 +39,7 @@ export const SETTING_KEYS = Object.freeze({
 });
 
 /** 计划算法版本；旧版本保存的计划在加载时作废并重算。 */
-export const PLAN_VERSION = 30;
+export const PLAN_VERSION = 31;
 
 export const RESOURCE_EMOJIS = Object.freeze([
   '🌱',

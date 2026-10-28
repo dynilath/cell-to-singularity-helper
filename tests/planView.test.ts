@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planGoalText, planSummary } from '../src/ui/planView.ts';
+import { groupPlanSteps, planGoalText, planSummary } from '../src/ui/planView.ts';
 
 function step(type, label, extra = {}) {
   return { type, label, ...extra };
@@ -79,6 +79,33 @@ describe('planSummary', () => {
     expect(summary).toContain('首步：升级1');
     expect(summary).toContain('末步：升级20');
     expect(summary.length).toBeLessThan(150);
+  });
+});
+
+describe('groupPlanSteps', () => {
+  it('merges consecutive purchases at the same timestamp for display', () => {
+    const groups = groupPlanSteps([
+      { type: 'buy', label: '心脏', nth: 110, t: 0 },
+      { type: 'buy', label: '心脏', nth: 111, t: 0 },
+      { type: 'buy', label: '心脏', nth: 112, t: 0 },
+      { type: 'upgrade', label: '骨头', t: 0 },
+      { type: 'upgrade', label: '骨头', t: 0 },
+      { type: 'buy', label: '骨骼', nth: 8, t: 180, offlineBlock: 1 },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].steps).toHaveLength(5);
+    expect(groups[0].indices).toEqual([0, 1, 2, 3, 4]);
+    expect(groups[1].steps).toHaveLength(1);
+    expect(groups[1].t).toBe(180);
+  });
+
+  it('does not merge across different timestamps or offline blocks', () => {
+    const groups = groupPlanSteps([
+      { type: 'buy', label: '心脏', t: 0 },
+      { type: 'buy', label: '心脏', t: 1 },
+      { type: 'buy', label: '心脏', t: 1, offlineBlock: 2 },
+    ]);
+    expect(groups).toHaveLength(3);
   });
 });
 

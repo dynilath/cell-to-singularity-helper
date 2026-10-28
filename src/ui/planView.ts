@@ -14,6 +14,69 @@ function stepCost(step) {
   return step.type === 'upgrade' ? step.cost : step.price;
 }
 
+/**
+ * 同一时刻连续完成的购买合并成一组用于时间表展示。
+ * 只改展示，不改计划步骤或执行顺序。
+ */
+export function groupPlanSteps(steps) {
+  const groups = [];
+  steps.forEach((step, index) => {
+    const last = groups[groups.length - 1];
+    const sameTime = last && Math.abs((last.t ?? 0) - (step.t ?? 0)) < 1e-6;
+    const sameBlock =
+      last && (last.offlineBlock ?? 0) === (step.offlineBlock ?? 0);
+    if (last && sameTime && sameBlock) {
+      last.steps.push(step);
+      last.indices.push(index);
+      return;
+    }
+    groups.push({
+      t: step.t ?? 0,
+      offlineBlock: step.offlineBlock ?? 0,
+      steps: [step],
+      indices: [index],
+    });
+  });
+  return groups;
+}
+
+function groupActionText(steps) {
+  if (steps.length === 1) return actionText(steps[0]);
+  const counts = new Map();
+  for (const step of steps) {
+    const key = `${step.type}:${step.label}`;
+    const entry = counts.get(key);
+    if (entry) entry.count += 1;
+    else counts.set(key, { label: step.label, count: 1, type: step.type });
+  }
+  const entries = [...counts.values()];
+  if (entries.length === 1 && entries[0].type === 'buy') {
+    return `买 ${entries[0].label} ×${entries[0].count}`;
+  }
+  const parts = entries
+    .slice(0, 3)
+    .map((entry) =>
+      entry.count > 1 ? `${entry.label}×${entry.count}` : entry.label,
+    );
+  const suffix = entries.length > 3 ? ` 等 ${entries.length} 项` : '';
+  return `立即购买 ${steps.length} 项：${parts.join('、')}${suffix}`;
+}
+
+function groupCostText(steps) {
+  const totals = new Map();
+  for (const step of steps) {
+    const name = resourceText(step);
+    totals.set(name, (totals.get(name) ?? 0) + stepCost(step));
+  }
+  return [...totals.entries()]
+    .map(([name, amount]) => `${fmtNum(amount)} ${name}`)
+    .join(' + ');
+}
+
+function groupResourceText(steps) {
+  return [...new Set(steps.map((step) => resourceText(step)))].join(' / ');
+}
+
 export function planSummary(plan) {
   if (!plan.steps.length) return '✅ 没有待完成的升级';
   const lead =
@@ -141,22 +204,18 @@ export function createPlanView({ document }) {
   function renderTimeline() {
     timeline.replaceChildren();
     if (!currentPlan) return;
+    const groups = groupPlanSteps(currentPlan.steps);
     let lastOfflineBlock = 0;
-    currentPlan.steps.forEach((step, index) => {
+    groups.forEach((group, rowIndex) => {
+      const first = group.steps[0];
       if (
-        step.offlineBlock &&
-        step.offlineBlock !== lastOfflineBlock &&
-        (step.offlineWait ?? 0) >= 60
+        first.offlineBlock &&
+        first.offlineBlock !== lastOfflineBlock &&
+        (first.offlineWait ?? 0) >= 60
       ) {
-        const blockSteps = [];
-        for (
-          let cursor = index;
-          cursor < currentPlan.steps.length &&
-          currentPlan.steps[cursor].offlineBlock === step.offlineBlock;
-          cursor += 1
-        ) {
-          blockSteps.push(currentPlan.steps[cursor]);
-        }
+        const blockSteps = currentPlan.steps.filter(
+          (step) => step.offlineBlock === first.offlineBlock,
+        );
         const names = blockSteps.map((item) => item.label);
         const nameText =
           names.length <= 3
@@ -167,27 +226,29 @@ export function createPlanView({ document }) {
         const cell = document.createElement('td');
         cell.colSpan = 6;
         cell.textContent =
-          `🏕️ 离线 ${fmtDur(step.offlineWait ?? 0)}` +
+          `🏕️ 离线 ${fmtDur(first.offlineWait ?? 0)}` +
           `${currentPlan.adDoubled ? '（离线收入广告 ×2）' : ''}` +
           ` · 回来后买：${nameText}`;
         breakRow.append(cell);
         timeline.append(breakRow);
       }
-      lastOfflineBlock = step.offlineBlock || 0;
+      lastOfflineBlock = first.offlineBlock || 0;
 
       const row = document.createElement('tr');
-      if (step.type === 'upgrade') row.classList.add('upg');
-      if (step.offline) row.classList.add('offline');
-      if (index < currentPlan.stepIndex) row.classList.add('done');
-      if (index === currentPlan.stepIndex) row.classList.add('cur');
+      if (group.steps.every((step) => step.type === 'upgrade')) row.classList.add('upg');
+      if (group.steps.some((step) => step.offline)) row.classList.add('offline');
+      if (group.indices.every((index) => index < currentPlan.stepIndex)) {
+        row.classList.add('done');
+      }
+      if (group.indices.includes(currentPlan.stepIndex)) row.classList.add('cur');
 
       const cells = [
-        String(index + 1),
-        actionText(step),
-        fmtNum(stepCost(step)),
-        resourceText(step),
-        fmtDur(step.t),
-        fmtClock(currentPlan.anchor + step.t * 1000),
+        String(rowIndex + 1),
+        groupActionText(group.steps),
+        groupCostText(group.steps),
+        groupResourceText(group.steps),
+        fmtDur(first.t),
+        fmtClock(currentPlan.anchor + first.t * 1000),
       ];
       for (const value of cells) {
         const cell = document.createElement('td');

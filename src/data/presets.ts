@@ -65,7 +65,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'fear',
     title: '微型探索 · 面对恐惧',
-    source: 'docs/微型探索 面对恐惧.md',
+    source: 'docs/presets/微型探索 面对恐惧.md',
     emoji: '🔥',
     factoryGrowth: 1.15,
     notes: [
@@ -112,7 +112,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'anatomy',
     title: '生命解剖学',
-    source: 'docs/生命解剖学.md',
+    source: 'docs/presets/生命解剖学.md',
     docLevel: 1,
     resources: [
       { key: 'blue', name: '脱氧血液', emoji: '🔵' },

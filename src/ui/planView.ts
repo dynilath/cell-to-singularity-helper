@@ -3,7 +3,12 @@ import { cleanResourceText } from '../data/schema.ts';
 import { byId } from './dom.ts';
 
 function actionText(step) {
-  return step.type === 'upgrade' ? `买 ${step.label}` : `买 ${step.label} · 第${step.nth}台`;
+  if (step.type === 'upgrade') {
+    return step.effect === 'activate'
+      ? `解锁 ${step.label} 自动产出`
+      : `买 ${step.label}`;
+  }
+  return `买 ${step.label} · 第${step.nth}台`;
 }
 
 function resourceText(step) {
@@ -44,7 +49,7 @@ export function groupActionText(steps) {
   if (steps.length === 1) return actionText(steps[0]);
   const entries = new Map<
     string,
-    { type: 'buy' | 'upgrade'; label: string; nths: number[] }
+    { type: 'buy' | 'upgrade'; label: string; effect?: string; nths: number[] }
   >();
   for (const step of steps) {
     const key = `${step.type}:${step.label}`;
@@ -52,7 +57,7 @@ export function groupActionText(steps) {
     if (!entry) {
       entry =
         step.type === 'upgrade'
-          ? { type: 'upgrade', label: step.label, nths: [] }
+          ? { type: 'upgrade', label: step.label, effect: step.effect, nths: [] }
           : { type: 'buy', label: step.label, nths: [] };
       entries.set(key, entry);
     }
@@ -62,7 +67,8 @@ export function groupActionText(steps) {
   const lines = [];
   for (const entry of entries.values()) {
     if (entry.type === 'upgrade') {
-      lines.push(`购买 ${entry.label}`);
+      const suffix = entry.effect === 'activate' ? '（解锁自动产出）' : '';
+      lines.push(`购买 ${entry.label}${suffix}`);
       continue;
     }
     const nths = [...new Set(entry.nths)].sort((left, right) => left - right);
@@ -172,8 +178,9 @@ export function planGoalText(plan) {
   if (plan.goal === 'unlock') return plan.goalLabel;
   const next = plan.steps?.[plan.stepIndex ?? 0] ?? plan.steps?.[0];
   if (!next) return '完成当前段后重新规划';
-  return next.type === 'buy'
-    ? `先买出「${next.label}」首台`
+  if (next.type === 'buy') return `先买出「${next.label}」首台`;
+  return next.effect === 'activate'
+    ? `先解锁「${next.label}」自动产出`
     : `先买「${next.label}」`;
 }
 

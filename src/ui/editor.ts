@@ -63,6 +63,73 @@ function withResource(document, labelText, input, picker) {
 }
 
 /**
+ * 可改名标题：默认只显示文字，点 ✏️ 才出现输入框。
+ * Enter / 失焦提交，Esc 取消；清空后回退到自动编号（如「工厂3」）。
+ */
+function editableName(document, { className, value, fallback, kind, onCommit }) {
+  const wrapper = element(document, 'div', className);
+  const display = element(document, 'b', '', value?.trim() || fallback);
+  const edit = element(document, 'button', 'name-edit', '✏️');
+  edit.type = 'button';
+  edit.tabIndex = -1; // 与行内其他工具按钮一致，不打断数据输入的 Tab 顺序
+  edit.title = `修改${kind}名称`;
+  edit.setAttribute('aria-label', `修改${kind}名称`);
+  wrapper.append(display, edit);
+
+  let input = null;
+
+  function showDisplay() {
+    display.textContent = value?.trim() || fallback;
+    display.classList.remove('hidden');
+    edit.classList.remove('hidden');
+  }
+
+  function finish(commit) {
+    if (!input) return;
+    const field = input;
+    input = null;
+    const next = commit ? field.value.trim() : value;
+    field.remove();
+    if (commit && next !== (value ?? '')) {
+      value = next;
+      showDisplay();
+      onCommit(next);
+    } else {
+      showDisplay();
+    }
+  }
+
+  edit.addEventListener('click', () => {
+    if (input) return;
+    input = element(document, 'input', 'name-input');
+    input.type = 'text';
+    input.value = value ?? '';
+    input.placeholder = fallback;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', `${kind}名称`);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finish(true);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(false);
+      }
+    });
+    input.addEventListener('blur', () => finish(true));
+    display.classList.add('hidden');
+    edit.classList.add('hidden');
+    wrapper.insertBefore(input, display);
+    input.focus();
+    input.select();
+  });
+
+  return wrapper;
+}
+
+/**
  * 资源 / 工厂 / 升级编辑器。所有字符串都直接写回 group，App 负责校验和重算。
  */
 export function createEditor({
@@ -273,10 +340,19 @@ export function createEditor({
       const head = element(document, 'div', 'fac-head');
       const contribution = element(document, 'span', 'contribution');
       contribution.dataset.contributionFor = factory.id;
-      const name = element(document, 'div', 'fac-name');
-      name.append(
-        element(document, 'b', '', factory.name?.trim() || `工厂${index + 1}`),
-      );
+      const name = editableName(document, {
+        className: 'fac-name',
+        value: factory.name,
+        fallback: `工厂${index + 1}`,
+        kind: '工厂',
+        onCommit: (next) => {
+          factory.name = next;
+          head
+            .querySelector('.fac-buy-actions')
+            ?.setAttribute('aria-label', `${next || `工厂${index + 1}`} 快速结算`);
+          signalChange();
+        },
+      });
       const lockChip = element(
         document,
         'span',
@@ -285,7 +361,28 @@ export function createEditor({
       );
       lockChip.dataset.factoryLockFor = factory.id;
       lockChip.classList.toggle('hidden', !lockReason);
-      name.append(lockChip);
+
+      const autoLabel = element(document, 'label', 'auto-toggle');
+      const autoInput = element(document, 'input');
+      autoInput.type = 'checkbox';
+      autoInput.checked = factory.active !== false;
+      autoInput.dataset.factoryActiveFor = factory.id;
+      const autoText = element(document, 'span', '', '');
+      const syncAuto = () => {
+        const on = autoInput.checked;
+        autoText.textContent = on ? '自动产出' : '未自动产出';
+        autoLabel.classList.toggle('off', !on);
+        row.classList.toggle('inactive', !on);
+      };
+      autoLabel.title = '取消后该工厂当前不计产出；购买「解锁自动产出」升级后会自动恢复';
+      autoInput.addEventListener('change', () => {
+        factory.active = autoInput.checked;
+        syncAuto();
+        signalChange();
+      });
+      autoLabel.append(autoInput, autoText);
+      syncAuto();
+      name.append(lockChip, autoLabel);
 
       const actions = element(document, 'div', 'fac-buy-actions');
       actions.setAttribute('role', 'group');
@@ -396,22 +493,33 @@ export function createEditor({
 
     group.upgrades.forEach((upgrade, index) => {
       if (upgrade.purchased) return;
+      const activate = upgrade.effect === 'activate';
       const lockReason = upgradeLockReason(group, upgrade);
       const row = element(document, 'div', 'upg-row');
       row.dataset.targetFactoryId = upgrade.targetFactoryId;
       row.dataset.upgradeId = upgrade.id;
+      row.classList.toggle('activate-effect', activate);
       row.classList.toggle('locked', Boolean(lockReason));
       row.classList.toggle('hidden', hideLocked && Boolean(lockReason));
       const head = element(document, 'div', 'upg-head');
       head.append(
-        element(document, 'b', '', upgrade.name?.trim() || `升级${index + 1}`),
+        editableName(document, {
+          className: 'upg-name',
+          value: upgrade.name,
+          fallback: `升级${index + 1}`,
+          kind: '升级',
+          onCommit: (next) => {
+            upgrade.name = next;
+            signalChange();
+          },
+        }),
       );
 
       const status = element(
         document,
         'span',
         upgrade.purchased ? 'ok' : 'hint',
-        upgrade.purchased ? '已购买' : lockReason || '未购买',
+        upgrade.purchased ? '已购买' : lockReason || (activate ? '解锁自动产出' : '未购买'),
       );
       status.dataset.upgradeStatusFor = upgrade.id;
       head.append(status);
@@ -421,13 +529,15 @@ export function createEditor({
         document,
         'button',
         `small ${upgrade.purchased ? '' : 'primary'}`,
-        upgrade.purchased ? '已购买' : '购买',
+        upgrade.purchased ? '已购买' : activate ? '解锁产出' : '购买',
       );
       buy.type = 'button';
       buy.disabled = upgrade.purchased || Boolean(lockReason);
       buy.title = lockReason
         ? lockReason
-        : '扣除资源，把目标工厂的产出乘以这个倍率；按住 Ctrl 强制购买（资源不足时清零）';
+        : activate
+          ? '购买后让目标工厂开始自动产出；不改变单台产出。按住 Ctrl 强制购买（资源不足时清零）'
+          : '扣除资源，把目标工厂的产出乘以这个倍率；按住 Ctrl 强制购买（资源不足时清零）';
       buy.addEventListener('click', (event) => {
         onUpgradeBuy(upgrade.id, event.ctrlKey || event.metaKey);
       });
@@ -446,6 +556,24 @@ export function createEditor({
       head.append(actions);
 
       const fields = element(document, 'div', 'edit-grid');
+      const effect = selectInput(
+        document,
+        [
+          { id: 'multiply', name: '产出倍率' },
+          { id: 'activate', name: '解锁自动产出' },
+        ],
+        activate ? 'activate' : 'multiply',
+      );
+      effect.className = 'upg-effect';
+      effect.disabled = upgrade.purchased;
+      effect.title = '产出倍率：购买后永久乘到单台产出；解锁自动产出：让尚未自动产出的工厂开始按单台产出计算';
+      effect.addEventListener('change', () => {
+        upgrade.effect = effect.value === 'activate' ? 'activate' : 'multiply';
+        if (upgrade.effect === 'activate') upgrade.multiplier = '1';
+        renderUpgrades();
+        signalChange();
+      });
+
       const target = selectInput(document, factories, upgrade.targetFactoryId);
       target.disabled = upgrade.purchased;
       target.addEventListener('change', () => {
@@ -454,9 +582,9 @@ export function createEditor({
         signalChange();
       });
 
-      const multiplier = numberInput(document, upgrade.multiplier, '2');
+      const multiplier = numberInput(document, upgrade.multiplier, activate ? '不使用' : '2');
       multiplier.tabIndex = -1; // 倍率不进入 Tab 顺序
-      multiplier.disabled = upgrade.purchased;
+      multiplier.disabled = upgrade.purchased || activate;
       multiplier.addEventListener('input', () => {
         upgrade.multiplier = multiplier.value;
         signalChange();
@@ -480,7 +608,8 @@ export function createEditor({
 
       fields.append(
         field(document, '目标工厂', target),
-        field(document, '产出倍率', multiplier),
+        field(document, '效果', effect),
+        field(document, activate ? '产出倍率（不使用）' : '产出倍率', multiplier),
         withResource(document, '升级价格', cost, resource),
       );
       row.append(head, fields);
@@ -539,6 +668,7 @@ export function createEditor({
       const lockReason = rawFactory ? factoryLockReason(group, rawFactory) : null;
       row.classList.toggle('ignored', invalid);
       row.classList.toggle('locked', Boolean(lockReason));
+      row.classList.toggle('inactive', rawFactory?.active === false);
       row.title = invalid
         ? '工厂数据不完整，已忽略'
         : lockReason
@@ -575,17 +705,22 @@ export function createEditor({
       if (!buy) continue;
       const targetInvalid = invalidFactories.has(row.dataset.targetFactoryId);
       const rawUpgrade = group.upgrades.find((upgrade) => upgrade.id === row.dataset.upgradeId);
+      const activate = rawUpgrade?.effect === 'activate';
       const lockReason = rawUpgrade ? upgradeLockReason(group, rawUpgrade) : null;
       row.classList.toggle('locked', Boolean(lockReason));
       row.classList.toggle('hidden', hideLocked && Boolean(lockReason));
       const status = row.querySelector(`[data-upgrade-status-for="${row.dataset.upgradeId}"]`);
-      if (status) status.textContent = lockReason || '未购买';
+      if (status) {
+        status.textContent = lockReason || (activate ? '解锁自动产出' : '未购买');
+      }
       buy.disabled = targetInvalid || Boolean(lockReason);
       buy.title = targetInvalid
         ? '目标工厂数据无效，升级已忽略'
         : lockReason
           ? lockReason
-          : '扣除资源，把目标工厂的产出乘以这个倍率；按住 Ctrl 强制购买（资源不足时清零）';
+          : activate
+            ? '购买后让目标工厂开始自动产出；不改变单台产出。按住 Ctrl 强制购买（资源不足时清零）'
+            : '扣除资源，把目标工厂的产出乘以这个倍率；按住 Ctrl 强制购买（资源不足时清零）';
     }
     updateHiddenLockedNote(group);
 
@@ -598,6 +733,10 @@ export function createEditor({
       const resource = state.resources.find((item) => item.id === factory?.outputResourceId);
       if (!factory || !resource) {
         node.textContent = '';
+        continue;
+      }
+      if (factory.active === false) {
+        node.textContent = '未自动产出';
         continue;
       }
       const multiplier = factory.contributionMultiplier ?? 1;
@@ -636,11 +775,13 @@ export function createEditor({
     }
     for (const input of factoryHost.querySelectorAll('.fac-row input')) {
       if (input.type === 'checkbox') continue;
+      if (input.classList.contains('name-input')) continue;
       const label = input.closest('div')?.querySelector('label')?.textContent ?? '';
       if (label.includes('已拥有') || label.includes('增长倍率')) continue;
       convert(input);
     }
     for (const input of upgradeHost.querySelectorAll('.upg-row input')) {
+      if (input.classList.contains('name-input')) continue;
       const label = input.closest('div')?.querySelector('label')?.textContent ?? '';
       if (label.includes('倍率')) continue;
       convert(input);

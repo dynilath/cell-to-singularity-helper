@@ -38,6 +38,15 @@
     <div class="hint" id="preset-note">尚未引入预设。</div>
   </div>
   <div class="fab-section">
+    <b>存档（JSON）</b>
+    <div class="save-actions">
+      <button type="button" class="small" id="save-export">📤 导出存档</button>
+      <button type="button" class="small" id="save-import">📥 导入存档</button>
+    </div>
+    <input type="file" id="save-file" accept=".json,application/json" class="hidden">
+    <div class="hint" id="save-status" role="status" aria-live="polite">存档包含资源、工厂、升级、计划和提醒；不含音量、数字格式等偏好。</div>
+  </div>
+  <div class="fab-section">
     <button type="button" class="small" id="mh-open" data-menu-close>🧮 倍率助手</button>
     <div class="hint">根据“等级 → 价格”样本反推每级增长倍率，并可应用到全局倍率。</div>
   </div>
@@ -70,7 +79,7 @@
 
   <section id="upgrade-section">
     <div class="section-head">
-      <h2>② 升级<small>花资源买升级，永久把指定工厂的产出乘以倍率</small></h2>
+      <h2>② 升级<small>花资源买升级：乘产出倍率，或解锁工厂的自动产出</small></h2>
       <label class="switch" title="隐藏前置条件未满足的升级">
         <input type="checkbox" id="hide-locked-upgrades">
         <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
@@ -82,7 +91,7 @@
     <div class="fac-actions">
       <button type="button" class="small" id="add-upgrade">＋ 添加升级</button>
     </div>
-    <div class="hint">购买会扣除资源、把倍率直接乘到目标工厂的单台产出，并删除升级；删除只移除未购买的升级，不扣资源也不应用倍率。按住 Ctrl 再点购买可强制购买：资源不足时会把支付资源清零。新工厂的首台会解锁它的升级。</div>
+    <div class="hint">购买会扣除资源、把倍率直接乘到目标工厂的单台产出，并删除升级；删除只移除未购买的升级，不扣资源也不应用倍率。按住 Ctrl 再点购买可强制购买：资源不足时会把支付资源清零。新工厂的首台会解锁它的升级。升级名称默认只读：点名称旁的 ✏️ 才能输入，Enter 或失焦保存，Esc 取消。效果选「解锁自动产出」时不乘倍率，只把目标工厂的自动产出打开。</div>
   </section>
 
   <section id="factory-section">
@@ -97,7 +106,7 @@
     <div class="fac-actions">
       <button type="button" class="small" id="add-factory">＋ 添加工厂</button>
     </div>
-    <div class="hint">「买1/5/10个」按当前估算的资源扣款、增加已拥有数量和产出，并更新下一台价格；已拥有数量为 0 的工厂视为新工厂，规划会先点出它。按住 Ctrl 再点买X个可强制购买：资源不足时会把支付资源清零。</div>
+    <div class="hint">「买1/5/10个」按当前估算的资源扣款、增加已拥有数量和产出，并更新下一台价格；已拥有数量为 0 的工厂视为新工厂，规划会先点出它。按住 Ctrl 再点买X个可强制购买：资源不足时会把支付资源清零。工厂名称默认只读：点名称旁的 ✏️ 才能输入，Enter 或失焦保存，Esc 取消。取消「自动产出」勾选后该工厂当前不计产出，直到购买「解锁自动产出」升级；周期产出请换算成每秒数值填写。</div>
   </section>
 
   <section id="result-section">

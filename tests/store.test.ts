@@ -131,6 +131,36 @@ describe('normalizeStore', () => {
     expect(store.upgrades).toHaveLength(0);
   });
 
+  it('defaults old saves to auto-producing factories and multiplier upgrades', () => {
+    const store = normalizeStore(sampleStore(), NOW);
+    expect(store.factories[0].active).toBe(true);
+    expect(store.upgrades[0].effect).toBe('multiply');
+  });
+
+  it('keeps inactive factories and folds purchased auto-production upgrades', () => {
+    const raw = sampleStore();
+    raw.factories[0].unit = '10';
+    raw.factories[0].active = false;
+    raw.upgrades[0].effect = 'activate';
+    raw.upgrades[0].multiplier = '9';
+    raw.upgrades[0].purchased = true;
+    const store = normalizeStore(raw, NOW);
+    expect(store.factories[0].active).toBe(true);
+    expect(store.factories[0].unit).toBe('10');
+    expect(store.upgrades).toHaveLength(0);
+    expect(store.completedUpgrades).toContain('u1');
+  });
+
+  it('preserves an inactive factory with its pending auto-production upgrade', () => {
+    const raw = sampleStore();
+    raw.factories[0].active = false;
+    raw.upgrades[0].effect = 'activate';
+    raw.upgrades[0].multiplier = '9';
+    const store = normalizeStore(raw, NOW);
+    expect(store.factories[0].active).toBe(false);
+    expect(store.upgrades[0]).toMatchObject({ effect: 'activate', multiplier: '9' });
+  });
+
   it('normalizes a saved plan and clamps its step index', () => {
     const raw = sampleStore({
       plan: {

@@ -1027,7 +1027,7 @@ select:focus-visible {
 }
 
 .upg-row .edit-grid {
-  grid-template-columns: 1.1fr 0.8fr 1.2fr;
+  grid-template-columns: 1.05fr 0.85fr 0.75fr 1.25fr;
 }
 
 @media (max-width: 700px) {
@@ -1164,7 +1164,7 @@ select:focus-visible {
 
 .fac-head .fac-name {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   white-space: normal;
@@ -1183,7 +1183,8 @@ select:focus-visible {
 }
 
 @media (max-width: 700px) {
-  .upg-row .edit-grid > div:nth-child(3) {
+  .upg-row .edit-grid > div:nth-child(3),
+  .upg-row .edit-grid > div:last-child {
     grid-column: 1 / -1;
   }
 }
@@ -1320,6 +1321,8 @@ body.ctrl-force .upg-row button.primary:not(:disabled):hover {
   bottom: 76px;
   z-index: 100;
   width: min(340px, calc(100vw - 36px));
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
   padding: 14px;
   background: var(--card);
   border: 1px solid var(--border);
@@ -1353,6 +1356,16 @@ body.ctrl-force .upg-row button.primary:not(:disabled):hover {
 
 .fab-section .hint {
   margin: 0;
+}
+
+.save-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-actions button {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 #preset-note {
@@ -1540,4 +1553,98 @@ tr.offline td {
 
 .global-ad + .hint {
   margin-top: 0;
+}
+
+/* ---- 工厂/升级名称：默认只读，点 ✏️ 才变成输入框 ---- */
+.upg-head .upg-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.upg-head .upg-name > b {
+  color: var(--accent2);
+  font-size: 0.8rem;
+}
+
+.name-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(43, 58, 82, 0.45);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.name-edit:hover,
+.name-edit:focus-visible {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--accent2);
+  opacity: 1;
+}
+
+.fac-name > b,
+.upg-name > b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.name-input {
+  flex: 0 1 200px;
+  width: min(200px, 46vw);
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ---- 工厂自动产出与升级效果 ---- */
+.auto-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.auto-toggle input {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.auto-toggle.off {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.06);
+  color: var(--accent2);
+}
+
+.fac-row.inactive .fac-name > b {
+  color: var(--muted);
+}
+
+.fac-row.inactive .contribution {
+  color: var(--accent2);
+}
+
+.upg-row.activate-effect .upg-effect {
+  border-color: rgba(251, 191, 36, 0.45);
 }

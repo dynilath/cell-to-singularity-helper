@@ -161,13 +161,15 @@ describe('v6 boot', () => {
     expect(upgradeCostGroup.querySelectorAll('input')).toHaveLength(1);
   });
 
-  it('puts notation and preset import in the floating settings menu', () => {
+  it('puts notation, preset import, and save tools in the floating settings menu', () => {
     const context = boot();
     const menu = context.document.getElementById('fab-menu');
     expect(menu.classList.contains('hidden')).toBe(true);
     expect(context.document.getElementById('notation').closest('#fab-menu')).toBe(menu);
     expect(context.document.getElementById('preset-open').closest('#fab-menu')).toBe(menu);
     expect(context.document.getElementById('mh-open').closest('#fab-menu')).toBe(menu);
+    expect(context.document.getElementById('save-export').closest('#fab-menu')).toBe(menu);
+    expect(context.document.getElementById('save-import').closest('#fab-menu')).toBe(menu);
 
     click(context, '#fab-btn');
     expect(menu.classList.contains('hidden')).toBe(false);
@@ -178,6 +180,106 @@ describe('v6 boot', () => {
     );
     expect(menu.classList.contains('hidden')).toBe(true);
     expect(context.document.getElementById('fab-btn').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('exports the current store as a downloadable JSON archive', () => {
+    const context = boot();
+    click(context, '#fab-btn');
+
+    const captured = [];
+    const OriginalBlob = context.window.Blob;
+    context.window.Blob = class extends OriginalBlob {
+      constructor(parts, options) {
+        super(parts, options);
+        captured.push(parts.join(''));
+      }
+    };
+    context.window.URL.createObjectURL = vi.fn(() => 'blob:save');
+    context.window.URL.revokeObjectURL = vi.fn();
+    const anchors = [];
+    const clickSpy = vi
+      .spyOn(context.window.HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function () {
+        anchors.push(this);
+      });
+
+    click(context, '#save-export');
+
+    expect(captured).toHaveLength(1);
+    const payload = JSON.parse(captured[0]);
+    expect(payload.format).toBe('cell-to-singularity-helper-save');
+    expect(payload.version).toBe(1);
+    expect(payload.data.factories).toHaveLength(1);
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0].download).toMatch(/^探索助手存档-\d{8}-\d{4}\.json$/);
+    expect(anchors[0].href).toBe('blob:save');
+    expect(context.document.getElementById('save-status').textContent).toContain('已导出');
+    clickSpy.mockRestore();
+  });
+
+  it('imports a JSON archive and replaces the current data', async () => {
+    const context = boot();
+    click(context, '#fab-btn');
+    const archive = {
+      globalGrowth: '1.2',
+      resources: [{ id: 'rx', emoji: '💎', amount: '42', baseRate: '7' }],
+      factories: [
+        {
+          id: 'fx',
+          name: '新工厂',
+          price: '10',
+          unit: '2',
+          growth: '1.2',
+          owned: '3',
+          outputResourceId: 'rx',
+          costResourceId: 'rx',
+        },
+      ],
+      upgrades: [],
+      completedUpgrades: [],
+      plan: null,
+      reminder: null,
+      preset: null,
+    };
+    const file = {
+      name: 'my-save.json',
+      size: 100,
+      text: async () => JSON.stringify(archive),
+    };
+    const input = context.document.getElementById('save-file');
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new context.window.Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const saved = savedStore(context);
+    expect(saved.resources[0]).toMatchObject({ emoji: '💎', amount: '42' });
+    expect(saved.factories[0].name).toBe('新工厂');
+    expect(saved.factories[0].owned).toBe('3');
+    expect(context.document.querySelectorAll('#factory-rows .fac-row')).toHaveLength(1);
+    expect(context.document.querySelector('#factory-rows .fac-name b').textContent).toBe('新工厂');
+    expect(context.document.getElementById('save-status').textContent).toContain('已导入');
+  });
+
+  it('shows a clear error when the archive is invalid', async () => {
+    const context = boot();
+    click(context, '#fab-btn');
+    const file = {
+      name: 'broken.json',
+      size: 10,
+      text: async () => 'not json',
+    };
+    const input = context.document.getElementById('save-file');
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new context.window.Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(context.document.getElementById('save-status').classList.contains('err')).toBe(true);
+    expect(context.document.getElementById('save-status').textContent).toContain('导入失败');
+    expect(savedStore(context).factories[0].id).toBe('f1');
   });
 
   it('does not close a dialog when a text selection is released on the backdrop', () => {
@@ -230,8 +332,10 @@ describe('v6 boot', () => {
     }
     expect(factoryInputs(context)[3].tabIndex).toBe(-1); // 工厂增长倍率
     expect(upgradeInputs(context)[0].tabIndex).toBe(-1); // 升级倍率
-    const upgradeSelects = document.querySelectorAll('#upgrade-rows .upg-row .edit-grid select');
-    expect(upgradeSelects[1].tabIndex).toBe(-1); // 升级花费资源图标
+    const upgradeResourcePicker = document.querySelector(
+      '#upgrade-rows .upg-row .edit-grid .res-picker',
+    );
+    expect(upgradeResourcePicker.tabIndex).toBe(-1); // 升级花费资源图标
   });
 
   it('shows an overall operation preview when there are multiple upgrades', () => {
@@ -396,6 +500,210 @@ describe('v6 boot', () => {
     expect([...row.querySelectorAll('.fac-buy')].every((button) => button.disabled)).toBe(true);
     expect([...context.document.querySelectorAll('#timeline tr')].some((tr) => tr.textContent.includes('工厂2'))).toBe(false);
     expect(savedStore(context).plan.steps.some((step) => step.factoryId === 'f2')).toBe(false);
+  });
+});
+
+describe('factory and upgrade names', () => {
+  function namedStore() {
+    return sampleStore({
+      factories: [
+        {
+          id: 'f1',
+          name: '深不可测的存在',
+          price: '100',
+          unit: '10',
+          growth: '2',
+          owned: '1',
+          outputResourceId: 'r1',
+          costResourceId: 'r1',
+        },
+      ],
+      upgrades: [
+        {
+          id: 'u1',
+          name: '狗头人',
+          cost: '1000',
+          costResourceId: 'r1',
+          targetFactoryId: 'f1',
+          multiplier: '2',
+          purchased: false,
+        },
+      ],
+    });
+  }
+
+  it('shows names as read-only text until the edit button is clicked', () => {
+    const context = boot(namedStore());
+    const factoryName = context.document.querySelector('#factory-rows .fac-name');
+    expect(factoryName.querySelector('input.name-input')).toBeNull();
+    expect(factoryName.querySelector('b').textContent).toBe('深不可测的存在');
+    expect(factoryName.querySelector('.name-edit')).not.toBeNull();
+
+    const upgradeName = context.document.querySelector('#upgrade-rows .upg-name');
+    expect(upgradeName.querySelector('input')).toBeNull();
+    expect(upgradeName.querySelector('b').textContent).toBe('狗头人');
+    expect(upgradeName.querySelector('.name-edit')).not.toBeNull();
+  });
+
+  it('edits a factory name and saves it on Enter', () => {
+    const context = boot(namedStore());
+    click(context, '#factory-rows .name-edit');
+    const input = context.document.querySelector('#factory-rows .fac-name input.name-input');
+    expect(input).not.toBeNull();
+    expect(input.value).toBe('深不可测的存在');
+
+    input.value = '深不可测之核';
+    input.dispatchEvent(
+      new context.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
+
+    expect(savedStore(context).factories[0].name).toBe('深不可测之核');
+    expect(context.document.querySelector('#factory-rows .fac-name b').textContent).toBe(
+      '深不可测之核',
+    );
+    expect(context.document.querySelector('#factory-rows .fac-name input.name-input')).toBeNull();
+  });
+
+  it('edits an upgrade name on blur and reverts it on Escape', () => {
+    const context = boot(namedStore());
+    click(context, '#upgrade-rows .name-edit');
+    let input = context.document.querySelector('#upgrade-rows .upg-name input.name-input');
+    input.value = '河童';
+    input.dispatchEvent(new context.window.Event('blur'));
+
+    expect(savedStore(context).upgrades[0].name).toBe('河童');
+    expect(context.document.querySelector('#upgrade-rows .upg-name b').textContent).toBe('河童');
+
+    click(context, '#upgrade-rows .name-edit');
+    input = context.document.querySelector('#upgrade-rows .upg-name input.name-input');
+    input.value = '不该保存';
+    input.dispatchEvent(
+      new context.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+
+    expect(savedStore(context).upgrades[0].name).toBe('河童');
+    expect(context.document.querySelector('#upgrade-rows .upg-name b').textContent).toBe('河童');
+    expect(context.document.querySelector('#upgrade-rows .upg-name input')).toBeNull();
+  });
+
+  it('clears a name back to the automatic label', () => {
+    const context = boot(namedStore());
+    click(context, '#factory-rows .name-edit');
+    const input = context.document.querySelector('#factory-rows .fac-name input.name-input');
+    input.value = '   ';
+    input.dispatchEvent(
+      new context.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
+
+    expect(savedStore(context).factories[0].name).toBe('');
+    expect(context.document.querySelector('#factory-rows .fac-name b').textContent).toBe('工厂1');
+  });
+});
+
+describe('factory auto-production', () => {
+  function inactiveStore() {
+    return sampleStore({
+      resources: [
+        { id: 'r1', emoji: '🔥', name: '基因', amount: '1000', baseRate: '0' },
+      ],
+      factories: [
+        {
+          id: 'f1',
+          name: '粮库',
+          price: '500',
+          unit: '100',
+          growth: '2',
+          owned: '1',
+          outputResourceId: 'r1',
+          costResourceId: 'r1',
+          active: false,
+        },
+      ],
+      upgrades: [
+        {
+          id: 'u1',
+          name: '自动产出',
+          cost: '100',
+          costResourceId: 'r1',
+          targetFactoryId: 'f1',
+          multiplier: '1',
+          effect: 'activate',
+          purchased: false,
+        },
+      ],
+    });
+  }
+
+  it('shows an inactive factory with zero contribution', () => {
+    const context = boot(inactiveStore());
+    const row = context.document.querySelector('#factory-rows .fac-row');
+    const toggle = row.querySelector('.auto-toggle input');
+    expect(toggle.checked).toBe(false);
+    expect(toggle.closest('.auto-toggle').textContent).toContain('未自动产出');
+    expect(row.querySelector('[data-contribution-for]').textContent).toBe('未自动产出');
+    expect(resourceInputs(context)[2].value).toBe('0');
+
+    const status = context.document.querySelector(
+      '#upgrade-rows .upg-row [data-upgrade-status-for]',
+    );
+    expect(status.textContent).toBe('解锁自动产出');
+    expect(context.document.querySelector('#upgrade-rows .upg-effect').value).toBe('activate');
+  });
+
+  it('stops counting a factory when auto production is unchecked', () => {
+    const context = boot();
+    const checkbox = context.document.querySelector('#factory-rows .auto-toggle input');
+    expect(checkbox.checked).toBe(true);
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new context.window.Event('change', { bubbles: true }));
+
+    expect(savedStore(context).factories[0].active).toBe(false);
+    expect(
+      context.document.querySelector('#factory-rows [data-contribution-for]').textContent,
+    ).toBe('未自动产出');
+  });
+
+  it('buys an auto-production upgrade and starts the factory', () => {
+    const context = boot(inactiveStore());
+    click(context, '#upgrade-rows .upg-row button.primary');
+
+    const saved = savedStore(context);
+    expect(saved.upgrades).toHaveLength(0);
+    expect(saved.factories[0].active).toBe(true);
+    expect(saved.resources[0].amount).toBe('900');
+    expect(context.document.querySelector('#factory-rows .auto-toggle input').checked).toBe(true);
+    expect(
+      context.document.querySelector('#factory-rows [data-contribution-for]').textContent,
+    ).toContain('当前贡献 100');
+    expect(context.document.getElementById('upgrade-status').textContent).toContain(
+      '开始自动产出',
+    );
+  });
+
+  it('applies an auto-production step in step mode', () => {
+    const context = boot(inactiveStore());
+    click(context, '#start-steps');
+    click(context, '#complete-step');
+
+    expect(savedStore(context).factories[0].active).toBe(true);
+  });
+
+  it('switches an upgrade between multiplier and auto-production effects', () => {
+    const context = boot(sampleStore());
+    const select = context.document.querySelector('#upgrade-rows .upg-effect');
+    expect(select.value).toBe('multiply');
+
+    select.value = 'activate';
+    select.dispatchEvent(new context.window.Event('change', { bubbles: true }));
+
+    const saved = savedStore(context);
+    expect(saved.upgrades[0]).toMatchObject({ effect: 'activate', multiplier: '1' });
+    const multiplier = context.document.querySelector('#upgrade-rows .edit-grid input');
+    expect(multiplier.disabled).toBe(true);
+    expect(context.document.querySelector('#upgrade-rows .upg-row button.primary').disabled).toBe(
+      true,
+    );
   });
 });
 

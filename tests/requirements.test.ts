@@ -41,4 +41,21 @@ describe('prerequisites', () => {
     group.completedUpgrades.push(dog.id);
     expect(upgradeLockReason(group, banik)).toBeNull();
   });
+
+  it('needs an auto-production upgrade only while its factory is inactive', () => {
+    const group = presetGroup();
+    const factory = group.factories[0];
+    factory.owned = '1';
+    factory.active = false;
+    const upgrade = {
+      ...group.upgrades[0],
+      targetFactoryId: factory.id,
+      effect: 'activate',
+      requires: null,
+    };
+    expect(upgradeLockReason(group, upgrade)).toBeNull();
+
+    factory.active = true;
+    expect(upgradeLockReason(group, upgrade)).toContain('已自动产出');
+  });
 });

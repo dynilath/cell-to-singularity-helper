@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   emptyCursor,
+  ratesOf,
   replayAction,
   replayPath,
 } from '../src/core/plannerSimulation.ts';
@@ -87,5 +88,52 @@ describe('planner macro simulation', () => {
     expect(result.state.resources[0].amount).toBe(13500);
     expect(result.steps.map((step) => step.offlineBlock)).toEqual([1, 1, 1, 1, 1, 2]);
     expect(result.steps.map((step) => step.t)).toEqual([180, 180, 180, 180, 180, 360]);
+  });
+
+  it('activates an inactive factory with an auto-production upgrade', () => {
+    const state = {
+      resources: [{ id: 'r', name: '资源', emoji: '🔴', amount: 1000, baseRate: 0 }],
+      factories: [
+        {
+          id: 'f',
+          label: '粮库',
+          price: 100,
+          unit: 10,
+          growth: 2,
+          owned: 2,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          active: false,
+        },
+      ],
+      upgrades: [
+        {
+          id: 'activate',
+          label: '自动产出',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'f',
+          multiplier: 1,
+          effect: 'activate',
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set<string>(),
+      globalAdMultiplier: 1,
+    };
+
+    expect(ratesOf(state).get('r')).toBe(0);
+    const result = replayAction(
+      state,
+      emptyCursor(),
+      { kind: 'upgrade', id: 'activate', count: 1, offline: false },
+      1,
+      true,
+    )!;
+
+    expect(result.state.factories[0].active).toBe(true);
+    expect(result.state.factories[0].unit).toBe(10);
+    expect(ratesOf(result.state).get('r')).toBe(20);
+    expect(result.steps[0]).toMatchObject({ type: 'upgrade', effect: 'activate' });
   });
 });

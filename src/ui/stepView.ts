@@ -3,7 +3,12 @@ import { cleanResourceText } from '../data/schema.ts';
 import { byId, hide, show } from './dom.ts';
 
 function actionText(step) {
-  return step.type === 'upgrade' ? `买 ${step.label}` : `买 ${step.label} · 第${step.nth}台`;
+  if (step.type === 'upgrade') {
+    return step.effect === 'activate'
+      ? `解锁 ${step.label} 自动产出`
+      : `买 ${step.label}`;
+  }
+  return `买 ${step.label} · 第${step.nth}台`;
 }
 
 /**

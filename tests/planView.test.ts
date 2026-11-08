@@ -41,6 +41,20 @@ describe('planSummary', () => {
     expect(summary).toContain('升级1 → 升级2 → 升级3');
   });
 
+  it('marks auto-production upgrades distinctly in action and goal text', () => {
+    expect(
+      groupActionText([step('upgrade', '兰花蜂', { effect: 'activate' })]),
+    ).toBe('解锁 兰花蜂 自动产出');
+    expect(
+      planGoalText({
+        goal: 'unlock',
+        complete: false,
+        goalLabel: '先解锁「兰花蜂」自动产出',
+        steps: [step('upgrade', '兰花蜂', { effect: 'activate' })],
+      }),
+    ).toBe('先解锁「兰花蜂」自动产出');
+  });
+
   it('keeps the new-factory goal and its operation order', () => {
     const summary = planSummary({
       goal: 'new-factory',

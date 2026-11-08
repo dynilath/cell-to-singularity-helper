@@ -33,6 +33,7 @@ interface Target {
   id: string;
   label: string;
   requiredOwned: number;
+  effect?: 'multiply' | 'activate';
 }
 
 interface PlannerContext {
@@ -125,7 +126,13 @@ function findLockedTarget(state: PlannerState): Target | null {
     const wait = singleItemWait(state, upgrade.costResourceId, upgrade.cost);
     if (wait === null) return;
     candidates.push({
-      target: { kind: 'upgrade', id: upgrade.id, label: upgrade.label, requiredOwned: 1 },
+      target: {
+        kind: 'upgrade',
+        id: upgrade.id,
+        label: upgrade.label,
+        requiredOwned: 1,
+        effect: upgrade.effect,
+      },
       wait,
     });
   };
@@ -208,7 +215,13 @@ function findOpenTarget(state: PlannerState): Target | null {
     const wait = singleItemWait(state, upgrade.costResourceId, upgrade.cost);
     if (wait === null) continue;
     candidates.push({
-      target: { kind: 'upgrade', id: upgrade.id, label: upgrade.label, requiredOwned: 1 },
+      target: {
+        kind: 'upgrade',
+        id: upgrade.id,
+        label: upgrade.label,
+        requiredOwned: 1,
+        effect: upgrade.effect,
+      },
       wait,
     });
   }
@@ -279,7 +292,11 @@ function buildContext(
       if (targetResources.has(factory.outputResourceId)) addFactory(factory.id);
     }
     for (const upgrade of state.upgrades) {
-      if (!upgrade.purchased && upgrade.multiplier > 1 && factoryIds.has(upgrade.targetFactoryId)) {
+      if (upgrade.purchased || !factoryIds.has(upgrade.targetFactoryId)) continue;
+      if (upgrade.effect === 'activate') {
+        const target = factoryById.get(upgrade.targetFactoryId);
+        if (target && target.active === false) addUpgrade(upgrade.id);
+      } else if (upgrade.multiplier > 1) {
         addUpgrade(upgrade.id);
       }
     }
@@ -385,6 +402,14 @@ function batchCandidates(
   return counts.slice(0, limit);
 }
 
+function upgradeRateGain(state: PlannerState, upgrade: PlannerState['upgrades'][number]) {
+  const target = state.factories.find((factory) => factory.id === upgrade.targetFactoryId);
+  if (!target) return 0;
+  const base = target.owned * target.unit * (state.globalAdMultiplier ?? 1);
+  if (upgrade.effect === 'activate') return target.active === false ? base : 0;
+  return base * Math.max(0, upgrade.multiplier - 1);
+}
+
 function generateActions(state: PlannerState, context: PlannerContext, batchLimit: number) {
   const actions: MacroAction[] = [];
   const keys = new Set<string>();
@@ -420,7 +445,10 @@ function generateActions(state: PlannerState, context: PlannerContext, batchLimi
         left.id === context.target.id || context.requiredUpgradeIds.has(left.id) ? 1 : 0;
       const rightRequired =
         right.id === context.target.id || context.requiredUpgradeIds.has(right.id) ? 1 : 0;
-      return rightRequired - leftRequired || Math.log(right.multiplier) - Math.log(left.multiplier);
+      return (
+        rightRequired - leftRequired ||
+        upgradeRateGain(state, right) - upgradeRateGain(state, left)
+      );
     });
   const selected = upgrades.slice(0, MAX_UPGRADES_PER_STATE);
   if (
@@ -568,7 +596,11 @@ function isTargetOnly(path: MacroAction[], target: Target) {
 }
 
 function targetLabel(target: Target) {
-  if (target.kind === 'upgrade') return `先买「${target.label}」`;
+  if (target.kind === 'upgrade') {
+    return target.effect === 'activate'
+      ? `先解锁「${target.label}」自动产出`
+      : `先买「${target.label}」`;
+  }
   return target.requiredOwned > 1
     ? `先把「${target.label}」补到 ${target.requiredOwned} 台`
     : `先买出「${target.label}」首台`;

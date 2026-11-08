@@ -74,6 +74,7 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
         owned,
         outputResourceId: factory.outputResourceId,
         costResourceId: factory.costResourceId,
+        active: factory.active !== false,
         requires: factory.requires ?? null,
       };
     })
@@ -89,9 +90,10 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
       }
 
       const cost = parseNum(upgrade.cost);
-      const multiplier = parseNum(upgrade.multiplier);
+      const effect = upgrade.effect === 'activate' ? 'activate' : 'multiply';
+      const multiplier = effect === 'activate' ? 1 : parseNum(upgrade.multiplier);
       if (!Number.isFinite(cost) || cost <= 0) errors.push(`升级${index + 1} 的价格无效`);
-      if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      if (effect === 'multiply' && (!Number.isFinite(multiplier) || multiplier <= 0)) {
         errors.push(`升级${index + 1} 的倍率无效`);
       }
       if (!resourceIds.has(upgrade.costResourceId)) errors.push(`升级${index + 1} 的资源无效`);
@@ -99,8 +101,7 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
       if (
         !Number.isFinite(cost) ||
         cost <= 0 ||
-        !Number.isFinite(multiplier) ||
-        multiplier <= 0 ||
+        (effect === 'multiply' && (!Number.isFinite(multiplier) || multiplier <= 0)) ||
         !resourceIds.has(upgrade.costResourceId)
       ) {
         return null;
@@ -113,6 +114,7 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
         costResourceId: upgrade.costResourceId,
         targetFactoryId: upgrade.targetFactoryId,
         multiplier,
+        effect,
         purchased: upgrade.purchased === true,
         requires: upgrade.requires ?? null,
       };
@@ -167,12 +169,16 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
   };
 }
 
+/**
+ * 已购买的倍率升级折算成工厂产出倍率。
+ * “解锁自动产出”升级不走倍率：购买时直接把工厂 active 打开。
+ */
 export function multipliersFor(state: SimulationState): Map<string, number> {
   const multipliers = new Map<string, number>(
     state.factories.map((factory) => [factory.id, 1]),
   );
   for (const upgrade of state.upgrades) {
-    if (!upgrade.purchased || upgrade.multiplier <= 0) continue;
+    if (!upgrade.purchased || upgrade.effect === 'activate' || upgrade.multiplier <= 0) continue;
     if (!multipliers.has(upgrade.targetFactoryId)) continue;
     multipliers.set(
       upgrade.targetFactoryId,
@@ -191,7 +197,7 @@ export function computeRates(
   );
   const globalMultiplier = state.globalAdMultiplier ?? 1;
   for (const factory of state.factories) {
-    if (factory.owned <= 0 || factory.unit <= 0) continue;
+    if (factory.active === false || factory.owned <= 0 || factory.unit <= 0) continue;
     const contribution =
       factory.owned *
       factory.unit *
@@ -211,7 +217,7 @@ export function factoryContribution(
   multipliers: Map<string, number> = multipliersFor(state),
 ): number {
   const factory = state.factories.find((item) => item.id === factoryId);
-  if (!factory || factory.owned <= 0 || factory.unit <= 0) return 0;
+  if (!factory || factory.active === false || factory.owned <= 0 || factory.unit <= 0) return 0;
   return (
     factory.owned *
     factory.unit *
@@ -257,7 +263,12 @@ export function upgradeMultiplierFor(state, factoryId, additionalUpgradeId = nul
   const multipliers = multipliersFor(state);
   if (additionalUpgradeId) {
     const upgrade = state.upgrades.find((item) => item.id === additionalUpgradeId);
-    if (upgrade && !upgrade.purchased && multipliers.has(factoryId)) {
+    if (
+      upgrade &&
+      upgrade.effect !== 'activate' &&
+      !upgrade.purchased &&
+      multipliers.has(factoryId)
+    ) {
       multipliers.set(factoryId, multipliers.get(factoryId) * upgrade.multiplier);
     }
   }

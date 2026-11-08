@@ -1,6 +1,7 @@
 import { fmtDur, fmtNum, setNotationMode, parseNum } from './core/numbers.ts';
 import { buildState, factoryQuote } from './core/exploration.ts';
 import { cleanResourceText, PLAN_VERSION, resourceLabel } from './data/schema.ts';
+import { buildSaveText, parseSaveText, saveFileName } from './data/saveFile.ts';
 import { factoryLockReason, upgradeLockReason } from './data/requirements.ts';
 import { buildPresetStore } from './data/presets.ts';
 import {
@@ -59,6 +60,8 @@ export function createApp({ document, window }) {
   let halfCheckbox = null;
   let armButton = null;
   let globalGrowth = null;
+  let saveStatus = null;
+  let saveFileInput = null;
 
   const alarm = createAlarm({ document, window });
   alarm.setVolume(settings.volume);
@@ -143,6 +146,86 @@ export function createApp({ document, window }) {
       `已引入预设「${preset.title}」：声望 ${level}，徽章 +${badgePercent}%。`,
       'factory',
     );
+  }
+
+  function setSaveStatus(message, isError = false) {
+    if (!saveStatus) return;
+    saveStatus.textContent = message;
+    saveStatus.classList.toggle('err', isError);
+  }
+
+  function exportSave() {
+    try {
+      persistStore();
+      const text = buildSaveText(store, Date.now());
+      const blob = new window.Blob([text], { type: 'application/json;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = saveFileName(Date.now());
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      setSaveStatus(
+        `已导出存档：${store.resources.length} 个资源、${store.factories.length} 个工厂、` +
+          `${store.upgrades.length} 个升级。`,
+      );
+    } catch (error) {
+      setSaveStatus(
+        `导出失败：${error instanceof Error ? error.message : String(error)}`,
+        true,
+      );
+    }
+  }
+
+  function readSaveFileText(file) {
+    if (file && typeof file.text === 'function') return file.text();
+    return new Promise((resolve, reject) => {
+      const reader = new window.FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'));
+      reader.readAsText(file);
+    });
+  }
+
+  function applyImportedStore(next) {
+    cancelPendingRecompute();
+    stepView.hide();
+    planView.reset();
+    alarm.dismiss();
+    // Editor 持有的是同一个 store 对象，原地替换字段而不是换引用。
+    for (const key of Object.keys(store)) delete store[key];
+    Object.assign(store, next);
+    saveStore(storage, store);
+    renderAll();
+    checkDueReminders(true);
+  }
+
+  async function importSaveFile(file) {
+    setSaveStatus('正在读取存档…');
+    try {
+      const text = await readSaveFileText(file);
+      const next = parseSaveText(text, Date.now());
+      if (
+        !window.confirm(
+          '导入存档会覆盖当前资源、工厂、升级、计划和提醒，且无法撤销。继续？',
+        )
+      ) {
+        setSaveStatus('已取消导入。');
+        return;
+      }
+      applyImportedStore(next);
+      setSaveStatus(
+        `已导入「${file?.name || '存档'}」：${next.resources.length} 个资源、` +
+          `${next.factories.length} 个工厂、${next.upgrades.length} 个升级。`,
+      );
+    } catch (error) {
+      setSaveStatus(
+        `导入失败：${error instanceof Error ? error.message : String(error)}`,
+        true,
+      );
+    }
   }
 
   function refreshDrawer() {
@@ -459,15 +542,18 @@ export function createApp({ document, window }) {
       handleDataChange();
     }
     const factoryName = rawFactory.name?.trim() || `工厂${store.factories.indexOf(rawFactory) + 1}`;
+    const inactiveNote =
+      rawFactory.active === false ? ' 该工厂尚未自动产出，当前不计产出。' : '';
     setFactoryStatus(
-      short
+      (short
         ? `已强制结算：${factoryName} 买 ${count} 台，` +
-            `资源不足，已将 ${resourceLabel(resource)} 清零；下一台 ${fmtNum(quote.nextPrice)}。`
+          `资源不足，已将 ${resourceLabel(resource)} 清零；下一台 ${fmtNum(quote.nextPrice)}。`
         : forcedUnlock
           ? `已强制解锁并结算：${factoryName} 买 ${count} 台，` +
-              `花费 ${fmtNum(quote.totalCost)} ${resourceLabel(resource)}，下一台 ${fmtNum(quote.nextPrice)}。`
+            `花费 ${fmtNum(quote.totalCost)} ${resourceLabel(resource)}，下一台 ${fmtNum(quote.nextPrice)}。`
           : `已结算：${factoryName} 买 ${count} 台，` +
-              `花费 ${fmtNum(quote.totalCost)} ${resourceLabel(resource)}，下一台 ${fmtNum(quote.nextPrice)}。`,
+            `花费 ${fmtNum(quote.totalCost)} ${resourceLabel(resource)}，下一台 ${fmtNum(quote.nextPrice)}。`) +
+        inactiveNote,
     );
     persistStore();
   }
@@ -532,15 +618,24 @@ export function createApp({ document, window }) {
 
     materialize(built);
     rawResource.amount = fmtNum(short ? 0 : resource.amount - upgrade.cost);
-    const nextUnit = target.unit * upgrade.multiplier;
-    rawFactory.unit = fmtNum(nextUnit);
+    const activate = upgrade.effect === 'activate';
+    let nextUnit = target.unit;
+    if (activate) {
+      rawFactory.active = true;
+    } else {
+      nextUnit = target.unit * upgrade.multiplier;
+      rawFactory.unit = fmtNum(nextUnit);
+    }
     store.upgrades = store.upgrades.filter((item) => item.id !== upgradeId);
     markUpgradeCompleted(upgradeId);
     store.asOf = now;
 
+    const resultText = activate
+      ? `${target.label} 开始自动产出（${target.owned} 台 × ${fmtNum(target.unit)}/秒）`
+      : `${target.label} 单台产出 → ${fmtNum(nextUnit)}`;
     const purchaseText = short
-      ? `已强制购买 ${upgrade.label}：${target.label} 单台产出 → ${fmtNum(nextUnit)}；资源不足，已将 ${resourceLabel(resource)} 清零。`
-      : `已购买 ${upgrade.label}：${target.label} 单台产出 → ${fmtNum(nextUnit)}。`;
+      ? `已强制购买 ${upgrade.label}：${resultText}；资源不足，已将 ${resourceLabel(resource)} 清零。`
+      : `已购买 ${upgrade.label}：${resultText}。`;
 
     editor.render();
 
@@ -633,7 +728,11 @@ export function createApp({ document, window }) {
       materialize(built);
       const rawResource = store.resources.find((item) => item.id === upgrade.costResourceId);
       rawResource.amount = fmtNum(resource.amount - upgrade.cost);
-      rawFactory.unit = fmtNum(target.unit * upgrade.multiplier);
+      if (upgrade.effect === 'activate') {
+        rawFactory.active = true;
+      } else {
+        rawFactory.unit = fmtNum(target.unit * upgrade.multiplier);
+      }
       store.upgrades = store.upgrades.filter((item) => item.id !== step.upgradeId);
       markUpgradeCompleted(step.upgradeId);
       store.asOf = now;
@@ -701,7 +800,11 @@ export function createApp({ document, window }) {
 
   function reminderCopy(step, { half = false, lastStep = false } = {}) {
     const action =
-      step.type === 'buy' ? `买 ${step.label}·第${step.nth}台` : `买 ${step.label}`;
+      step.type === 'buy'
+        ? `买 ${step.label}·第${step.nth}台`
+        : step.effect === 'activate'
+          ? `解锁 ${step.label} 自动产出`
+          : `买 ${step.label}`;
     if (half) {
       return {
         title: `半程到！可以看广告翻倍了（${action} 时点过半）`,
@@ -711,7 +814,7 @@ export function createApp({ document, window }) {
     const cost = step.type === 'buy' ? step.price : step.cost;
     return {
       title: `该${action} 了！`,
-      body: `花费 ${fmtNum(cost)} ${cleanResourceText(step.resourceName) || '资源'} · 买完回来点「完成此步」${lastStep ? ' · 这是最后一步' : ''}`,
+      body: `花费 ${fmtNum(cost)} ${cleanResourceText(step.resourceName) || '资源'} · 完成后回来点「完成此步」${lastStep ? ' · 这是最后一步' : ''}`,
     };
   }
 
@@ -961,6 +1064,19 @@ export function createApp({ document, window }) {
     globalGrowth.addEventListener('input', () => {
       store.globalGrowth = globalGrowth.value;
       handleDataChange();
+    });
+
+    saveStatus = byId(document, 'save-status');
+    saveFileInput = byId(document, 'save-file');
+    byId(document, 'save-export').addEventListener('click', exportSave);
+    byId(document, 'save-import').addEventListener('click', () => {
+      saveFileInput.value = '';
+      saveFileInput.click();
+    });
+    saveFileInput.addEventListener('change', () => {
+      const file = saveFileInput.files && saveFileInput.files[0];
+      saveFileInput.value = '';
+      if (file) importSaveFile(file);
     });
 
     armButton = byId(document, 'arm-btn');

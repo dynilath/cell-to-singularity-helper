@@ -39,7 +39,7 @@ export const SETTING_KEYS = Object.freeze({
 });
 
 /** 计划算法版本；旧版本保存的计划在加载时作废并重算。 */
-export const PLAN_VERSION = 33;
+export const PLAN_VERSION = 34;
 
 export const RESOURCE_EMOJIS = Object.freeze([
   '🌱',
@@ -103,6 +103,7 @@ export function createEmptyFactory(resourceId = '') {
     owned: '0',
     outputResourceId: resourceId,
     costResourceId: resourceId,
+    active: true,
     requires: null,
   };
 }
@@ -115,6 +116,7 @@ export function createEmptyUpgrade(resourceId = '', targetFactoryId = '') {
     costResourceId: resourceId,
     targetFactoryId,
     multiplier: '2',
+    effect: 'multiply',
     purchased: false,
     requires: null,
   };
@@ -222,6 +224,7 @@ function normalizeFactory(raw, index, resourceIds) {
     owned: toText(record.owned ?? '0') || '0',
     outputResourceId,
     costResourceId,
+    active: record.active !== false,
     requires: normalizeRequirement(record.requires),
   };
 }
@@ -236,6 +239,7 @@ function normalizeUpgrade(raw, resourceIds, factoryIds) {
   const targetFactoryId = factoryIds.includes(toText(raw.targetFactoryId))
     ? toText(raw.targetFactoryId)
     : fallbackFactory;
+  const effect = raw.effect === 'activate' ? 'activate' : 'multiply';
 
   return {
     id: raw.id ? toText(raw.id) : createId('upg'),
@@ -243,7 +247,8 @@ function normalizeUpgrade(raw, resourceIds, factoryIds) {
     cost: toText(raw.cost),
     costResourceId,
     targetFactoryId,
-    multiplier: toText(raw.multiplier) || '2',
+    multiplier: toText(raw.multiplier) || (effect === 'activate' ? '1' : '2'),
+    effect,
     purchased: raw.purchased === true,
     requires: normalizeRequirement(raw.requires),
   };
@@ -288,6 +293,7 @@ function normalizePlanStep(raw, dataset) {
       type: 'upgrade',
       upgradeId: upgrade.id,
       label: toText(raw.label) || upgradeLabel(dataset, upgrade.id),
+      effect: upgrade.effect === 'activate' ? 'activate' : 'multiply',
       cost,
       resourceId: resource?.id ?? upgrade.costResourceId,
       resourceName: resource ? resourceLabel(resource) : '资源',
@@ -370,6 +376,10 @@ export function normalizeStore(raw, now = Date.now()) {
     }
     completed.add(upgrade.id);
     const target = factories.find((factory) => factory.id === upgrade.targetFactoryId);
+    if (upgrade.effect === 'activate') {
+      if (target) target.active = true;
+      continue;
+    }
     const unit = toNumber(target?.unit);
     const multiplier = toNumber(upgrade.multiplier);
     if (target && unit !== null && unit > 0 && multiplier !== null && multiplier > 0) {

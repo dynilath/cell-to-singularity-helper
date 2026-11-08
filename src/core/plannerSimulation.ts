@@ -52,7 +52,7 @@ export function ratesOf(state: PlannerState) {
   const rates = new Map(state.resources.map((resource) => [resource.id, resource.baseRate]));
   const global = state.globalAdMultiplier ?? 1;
   for (const factory of state.factories) {
-    if (factory.owned <= 0 || factory.unit <= 0) continue;
+    if (factory.active === false || factory.owned <= 0 || factory.unit <= 0) continue;
     rates.set(
       factory.outputResourceId,
       (rates.get(factory.outputResourceId) ?? 0) + factory.owned * factory.unit * global,
@@ -85,7 +85,10 @@ export function upgradeActionable(state: PlannerState, upgradeId: string) {
   const upgrade = state.upgrades.find((item) => item.id === upgradeId);
   if (!upgrade || upgrade.purchased) return false;
   const target = state.factories.find((factory) => factory.id === upgrade.targetFactoryId);
-  return !!target && target.owned >= 1 && requirementMet(state, upgrade.requires);
+  if (!target || target.owned < 1 || !requirementMet(state, upgrade.requires)) return false;
+  // 工厂已经在自动产出时，再买解锁升级没有收益。
+  if (upgrade.effect === 'activate' && target.active !== false) return false;
+  return true;
 }
 
 function tolerance(cost: number) {
@@ -145,8 +148,13 @@ export function buyUpgrade(state: PlannerState, upgradeId: string) {
   upgrade.purchased = true;
   state.completedUpgrades.add(upgrade.id);
   const target = state.factories.find((factory) => factory.id === upgrade.targetFactoryId);
-  if (target) target.unit *= upgrade.multiplier;
-  return Number.isFinite(target?.unit ?? 1);
+  if (!target) return true;
+  if (upgrade.effect === 'activate') {
+    target.active = true;
+    return true;
+  }
+  target.unit *= upgrade.multiplier;
+  return Number.isFinite(target.unit);
 }
 
 function factoryStep(state: PlannerState, factoryId: string, cursor: PlanCursor, wait: WaitChoice | null): PlanStep {
@@ -175,6 +183,7 @@ function upgradeStep(state: PlannerState, upgradeId: string, cursor: PlanCursor,
     type: 'upgrade',
     upgradeId,
     label: upgrade.label,
+    effect: upgrade.effect === 'activate' ? 'activate' : 'multiply',
     cost: upgrade.cost,
     resourceId: upgrade.costResourceId,
     resourceName:

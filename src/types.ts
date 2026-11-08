@@ -1,6 +1,8 @@
 export type NotationMode = 'short' | 'chinese' | 'scientific';
 export type PlanStrategy = 'search';
 export type GlobalAdMultiplier = 1 | 2 | 4;
+/** 升级效果：乘单台产出，或解锁目标工厂的自动产出（工厂默认不产出）。 */
+export type UpgradeEffect = 'multiply' | 'activate';
 
 export interface Requirement {
   type: 'factory' | 'upgrade';
@@ -26,6 +28,8 @@ export interface RawFactory {
   owned: string;
   outputResourceId: string;
   costResourceId: string;
+  /** 是否正在自动产出；false 时不计产出，直到购买“解锁自动产出”升级。 */
+  active?: boolean;
   requires?: Requirement | null;
 }
 
@@ -36,6 +40,7 @@ export interface RawUpgrade {
   costResourceId: string;
   targetFactoryId: string;
   multiplier: string;
+  effect?: UpgradeEffect;
   purchased: boolean;
   requires?: Requirement | null;
 }
@@ -80,6 +85,7 @@ export interface FactoryState {
   owned: number;
   outputResourceId: string;
   costResourceId: string;
+  active?: boolean;
   requires?: Requirement | null;
   contributionMultiplier?: number;
 }
@@ -91,6 +97,7 @@ export interface UpgradeState {
   costResourceId: string;
   targetFactoryId: string;
   multiplier: number;
+  effect?: UpgradeEffect;
   purchased: boolean;
   requires?: Requirement | null;
 }
@@ -127,6 +134,7 @@ export interface PlanStep {
   t: number;
   factoryId?: string;
   upgradeId?: string;
+  effect?: UpgradeEffect;
   nth?: number;
   price?: number;
   cost?: number;

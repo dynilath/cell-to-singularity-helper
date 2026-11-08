@@ -43,13 +43,16 @@ export function factoryLockReason(group, factory) {
   return requirementReason(group, factory.requires);
 }
 
-/** 升级锁定原因：前置条件 + 目标工厂首台。 */
+/** 升级锁定原因：前置条件 + 目标工厂首台 + 自动产出升级是否仍有意义。 */
 export function upgradeLockReason(group, upgrade) {
   const requirement = requirementReason(group, upgrade.requires);
   if (requirement) return requirement;
   const target = group.factories.find((factory) => factory.id === upgrade.targetFactoryId);
   if (!target || (parseNum(target.owned) || 0) < 1) {
     return `需先买「${factoryName(group, upgrade.targetFactoryId)}」首台`;
+  }
+  if (upgrade.effect === 'activate' && target.active !== false) {
+    return `「${factoryName(group, upgrade.targetFactoryId)}」已自动产出，无需再解锁`;
   }
   return null;
 }

@@ -275,6 +275,83 @@ describe('state-space segment planner', () => {
     expect(labels).toContain('红产出');
   });
 
+  it('plans the auto-production upgrade for an inactive factory', () => {
+    const state = {
+      resources: [{ id: 'r', name: '资源', amount: 1000, baseRate: 0 }],
+      factories: [
+        {
+          id: 'granary',
+          label: '粮库',
+          price: 500,
+          unit: 100,
+          growth: 2,
+          owned: 1,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          active: false,
+        },
+      ],
+      upgrades: [
+        {
+          id: 'auto',
+          label: '自动产出',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'granary',
+          multiplier: 1,
+          effect: 'activate',
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set(),
+      globalAdMultiplier: 1,
+    };
+    const plan = planStateSpace(state, 1);
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]).toMatchObject({
+      type: 'upgrade',
+      upgradeId: 'auto',
+      effect: 'activate',
+    });
+    expect(plan.total).toBe(0);
+  });
+
+  it('ignores an auto-production upgrade once its factory is already producing', () => {
+    const state = {
+      resources: [{ id: 'r', name: '资源', amount: 1000, baseRate: 0 }],
+      factories: [
+        {
+          id: 'granary',
+          label: '粮库',
+          price: 500,
+          unit: 100,
+          growth: 2,
+          owned: 1,
+          outputResourceId: 'r',
+          costResourceId: 'r',
+          active: true,
+        },
+      ],
+      upgrades: [
+        {
+          id: 'auto',
+          label: '自动产出',
+          cost: 100,
+          costResourceId: 'r',
+          targetFactoryId: 'granary',
+          multiplier: 1,
+          effect: 'activate',
+          purchased: false,
+        },
+      ],
+      completedUpgrades: new Set(),
+      globalAdMultiplier: 1,
+    };
+    const plan = planStateSpace(state, 1);
+    expect(plan.steps).toHaveLength(0);
+    expect(plan.complete).toBe(true);
+  });
+
   it('does not mutate the input state', () => {
     const state = boneState();
     const before = JSON.stringify({

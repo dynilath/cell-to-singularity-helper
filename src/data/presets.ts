@@ -265,6 +265,7 @@ export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now 
     owned: '0',
     outputResourceId: resolveResource(factory.outputResource),
     costResourceId: resolveResource(factory.costResource),
+    active: true,
     requires: parseUnlock(factory.unlock, factoryIdByName, upgradeIdByName),
   }));
 
@@ -275,6 +276,7 @@ export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now 
     costResourceId: resolveResource(upgrade.costResource),
     targetFactoryId: factoryIdByName.get(upgrade.effect.target as string),
     multiplier: presetNumber(upgrade.effect.multiplier ?? 1),
+    effect: 'multiply',
     purchased: false,
     requires: parseUnlock(upgrade.unlock, factoryIdByName, upgradeIdByName),
   }));

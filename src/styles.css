@@ -215,16 +215,17 @@ input.bad {
 }
 
 .fac-row.dragging {
-  background: rgba(74, 222, 128, 0.05);
-  outline: 1px dashed var(--accent);
+  background: rgba(74, 222, 128, 0.035);
+  outline: 1px dashed rgba(74, 222, 128, 0.55);
   outline-offset: -4px;
+  border-bottom-color: transparent;
   border-radius: 12px;
-  box-shadow: inset 0 0 26px rgba(74, 222, 128, 0.1);
   pointer-events: none;
 }
 
-.fac-row.dragging > .fac-main {
-  opacity: 0.2;
+/* 原行只保留虚线落点，内容隐藏；真正跟手的是 body 下的 ghost。 */
+.fac-row.dragging > * {
+  visibility: hidden;
 }
 
 .fac-drag-ghost {
@@ -245,6 +246,7 @@ input.bad {
 }
 
 .fac-drag-ghost .fac-drag {
+  margin-bottom: 0;
   pointer-events: none;
 }
 

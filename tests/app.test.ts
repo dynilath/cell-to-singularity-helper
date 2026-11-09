@@ -707,6 +707,90 @@ describe('factory auto-production', () => {
   });
 });
 
+describe('factory drag reorder', () => {
+  it('moves the dragged row to the drop slot without leaving a duplicate', () => {
+    const store = sampleStore({
+      factories: [
+        {
+          id: 'f1',
+          name: 'A',
+          price: '100',
+          unit: '10',
+          growth: '2',
+          owned: '1',
+          outputResourceId: 'r1',
+          costResourceId: 'r1',
+        },
+        {
+          id: 'f2',
+          name: 'B',
+          price: '200',
+          unit: '20',
+          growth: '2',
+          owned: '1',
+          outputResourceId: 'r1',
+          costResourceId: 'r1',
+        },
+        {
+          id: 'f3',
+          name: 'C',
+          price: '300',
+          unit: '30',
+          growth: '2',
+          owned: '1',
+          outputResourceId: 'r1',
+          costResourceId: 'r1',
+        },
+      ],
+      upgrades: [],
+    });
+    const context = boot(store);
+    const rows = [...context.document.querySelectorAll('#factory-rows .fac-row')];
+    rows.forEach((row, index) => {
+      row.getBoundingClientRect = () => ({
+        top: index * 100,
+        bottom: index * 100 + 100,
+        left: 0,
+        right: 800,
+        width: 800,
+        height: 100,
+      });
+    });
+
+    const handle = rows[0].querySelector('.fac-drag');
+    handle.dispatchEvent(
+      new context.window.MouseEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientY: 50,
+      }),
+    );
+    expect(rows[0].classList.contains('dragging')).toBe(true);
+    expect(context.document.querySelectorAll('.fac-drag-ghost')).toHaveLength(1);
+    expect(context.document.querySelectorAll('.drag-placeholder')).toHaveLength(0);
+
+    context.document.dispatchEvent(
+      new context.window.MouseEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        clientY: 160,
+      }),
+    );
+    context.document.dispatchEvent(
+      new context.window.MouseEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        clientY: 160,
+      }),
+    );
+
+    expect(savedStore(context).factories.map((factory) => factory.name)).toEqual(['B', 'A', 'C']);
+    expect(context.document.querySelectorAll('.fac-drag-ghost')).toHaveLength(0);
+    expect(context.document.querySelectorAll('#factory-rows .fac-row.dragging')).toHaveLength(0);
+  });
+});
+
 describe('manual purchases', () => {
   it('force buys factories with Ctrl and clears the cost resource', () => {
     const context = boot(

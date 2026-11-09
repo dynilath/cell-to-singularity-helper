@@ -820,20 +820,20 @@ export function createEditor({
     if (event.isPrimary === false) return;
     event.preventDefault();
     const rect = row.getBoundingClientRect();
-    const placeholder = element(document, 'div', 'fac-row drag-placeholder');
-    placeholder.style.height = `${rect.height}px`;
-    row.before(placeholder);
-    row.classList.add('dragging');
 
+    // 先克隆，避免 ghost 继承 .dragging 的虚线边框/透明度。
     const ghost = row.cloneNode(true);
     ghost.classList.add('fac-drag-ghost');
     ghost.style.width = `${rect.width}px`;
     ghost.style.left = `${rect.left}px`;
     ghost.style.top = `${rect.top}px`;
     document.body.append(ghost);
+
+    // 原行留在原位作为落点占位：隐藏内容但保留高度，避免出现两条完整工厂。
+    row.classList.add('dragging');
     document.body.classList.add('drag-reorder');
 
-    dragState = { row, index, placeholder, ghost, startY: event.clientY, pointerId: event.pointerId };
+    dragState = { row, index, ghost, startY: event.clientY };
     row.setPointerCapture?.(event.pointerId);
     document.addEventListener('pointermove', onDragMove, { passive: false });
     document.addEventListener('pointerup', onDragEnd);
@@ -845,30 +845,26 @@ export function createEditor({
     event.preventDefault();
     const delta = event.clientY - dragState.startY;
     dragState.ghost.style.transform = `translateY(${delta}px)`;
-    const rows = [...factoryHost.querySelectorAll('.fac-row:not(.dragging):not(.drag-placeholder)')];
+    const rows = [...factoryHost.querySelectorAll('.fac-row:not(.dragging)')];
     const next = rows.find((row) => {
       const rect = row.getBoundingClientRect();
       return event.clientY < rect.top + rect.height / 2;
     });
-    if (next) factoryHost.insertBefore(dragState.placeholder, next);
-    else factoryHost.append(dragState.placeholder);
+    // 直接移动原行到落点，它本身就是虚线占位。
+    if (next) factoryHost.insertBefore(dragState.row, next);
+    else factoryHost.append(dragState.row);
   }
 
   function onDragEnd() {
     if (!dragState) return;
-    const { row, placeholder, ghost } = dragState;
-    let targetIndex = 0;
-    for (const child of factoryHost.children) {
-      if (child === placeholder) break;
-      if (child !== row && child.classList.contains('fac-row')) targetIndex += 1;
-    }
+    const { row, ghost } = dragState;
+    const targetIndex = [...factoryHost.querySelectorAll('.fac-row')].indexOf(row);
 
     const group = getGroup();
     const [moved] = group.factories.splice(dragState.index, 1);
     group.factories.splice(Math.min(targetIndex, group.factories.length), 0, moved);
 
     ghost.remove();
-    placeholder.remove();
     row.classList.remove('dragging');
     document.body.classList.remove('drag-reorder');
     document.removeEventListener('pointermove', onDragMove);

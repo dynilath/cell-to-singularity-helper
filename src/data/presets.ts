@@ -55,6 +55,8 @@ interface Preset {
   resources?: PresetResource[];
   /** 文档对应的声望等级；未填时使用 PRESET_DOC_LEVEL。 */
   docLevel?: number;
+  /** 文档产出是否含全局广告；未填时使用 PRESET_DOC_GLOBAL_AD。 */
+  docGlobalAd?: number;
   factoryGrowth?: number;
   notes: string[];
   factories: PresetFactory[];
@@ -107,6 +109,78 @@ export const PRESETS: Preset[] = [
       { name: '尼斯湖水怪', cost: 2e17, unlock: '泽西', effect: { kind: 'factory', target: '深不可测的存在', multiplier: 501 } },
       { name: '大脚怪', cost: 4e18, unlock: '尼斯湖水怪', effect: { kind: 'factory', target: '诡异生物', multiplier: 2 } },
       { name: 'Jimothy', cost: 4e18, unlock: '大脚怪', effect: { kind: 'factory', target: '诡异生物', multiplier: 2 } },
+    ],
+  },
+  {
+    id: 'trust',
+    title: '信任有价',
+    source: 'docs/presets/信任有价.md',
+    docLevel: 1,
+    docGlobalAd: 1,
+    resources: [
+      { key: 'shell', name: '货贝', emoji: '🐚' },
+      { key: 'coin', name: '货币', emoji: '🪙' },
+      { key: 'cash', name: '钞票', emoji: '💵' },
+      { key: 'credit', name: '信用', emoji: '💳' },
+    ],
+    factoryGrowth: 1.15,
+    notes: [
+      '文档未标注声望和全局广告基准；这里暂按声望 1、产出不含全局广告录入，导入时请按游戏实际声望调整。',
+      '文档尚未填写完整，当前只导入已列出的 4 个工厂和 43 个工厂效果升级。',
+      '点击收益升级「渔猎采集 / 赠送礼品 / 定居 / 专业分工」暂未建模；因此「商品货币」暂不设置「专业分工」前置。',
+      '工厂价格增长倍率未在文档中给出，暂用 1.15。',
+      '文档里的解锁条件已转成锁定前置；工厂前置要求该工厂至少 1 台。',
+    ],
+    factories: [
+      { name: '商品货币', cost: 25, output: 1, costResource: 'shell', outputResource: 'shell' },
+      { name: '硬币', cost: 1e9, output: 1, costResource: 'shell', outputResource: 'coin', unlock: '冶金术' },
+      { name: '纸币', cost: 1e9, output: 1, costResource: 'coin', outputResource: 'cash', unlock: '银行业' },
+      { name: '电子货币', cost: 1e9, output: 1, costResource: 'cash', outputResource: 'credit', unlock: '法定货币' },
+    ],
+    upgrades: [
+      { name: '债务', cost: 125, costResource: 'shell', unlock: '商品货币', effect: { kind: 'factory', target: '商品货币', multiplier: 2.5 } },
+      { name: '符木', cost: 5000, costResource: 'shell', unlock: '债务', effect: { kind: 'factory', target: '商品货币', multiplier: 2 } },
+      { name: '记账', cost: 800000, costResource: 'shell', unlock: '符木', effect: { kind: 'factory', target: '商品货币', multiplier: 2.5 } },
+      { name: '以物换物', cost: 20000, costResource: 'shell', unlock: '符木', effect: { kind: 'factory', target: '商品货币', multiplier: 2 } },
+      { name: '贝壳串珠', cost: 250000, costResource: 'shell', unlock: '以物换物', effect: { kind: 'factory', target: '商品货币', multiplier: 2.5 } },
+      { name: '内在价值', cost: 3e6, costResource: 'shell', unlock: '以物换物', effect: { kind: 'factory', target: '商品货币', multiplier: 2 } },
+      { name: '货贝', cost: 2.5e8, costResource: 'shell', unlock: '内在价值', effect: { kind: 'factory', target: '商品货币', multiplier: 3 } },
+      { name: '贵金属', cost: 9e6, costResource: 'shell', unlock: '内在价值', effect: { kind: 'factory', target: '商品货币', multiplier: 2.5 } },
+      { name: '冶金术', cost: 4e7, costResource: 'shell', unlock: '贵金属', effect: { kind: 'factory', target: '商品货币', multiplier: 2.5 } },
+      { name: '政府造币厂', cost: 4e10, costResource: 'shell', unlock: '冶金术', effect: { kind: 'factory', target: '商品货币', multiplier: 3 } },
+      { name: '铜贝', cost: 7.5e8, costResource: 'shell', unlock: '货贝', effect: { kind: 'factory', target: '商品货币', multiplier: 5 } },
+      { name: '利息', cost: 400000, costResource: 'coin', unlock: '硬币', effect: { kind: 'factory', target: '硬币', multiplier: 1.75 } },
+      { name: '吕底亚硬币', cost: 5000, costResource: 'coin', unlock: '硬币', effect: { kind: 'factory', target: '硬币', multiplier: 1.75 } },
+      { name: '谢克尔', cost: 600, costResource: 'coin', unlock: '硬币', effect: { kind: 'factory', target: '商品货币', multiplier: 4 } },
+      { name: '中国钱币', cost: 150000, costResource: 'coin', unlock: '硬币', effect: { kind: 'factory', target: '硬币', multiplier: 2 } },
+      { name: '古罗马硬币', cost: 5e6, costResource: 'coin', unlock: '谢克尔', effect: { kind: 'factory', target: '硬币', multiplier: 2 } },
+      { name: '高利贷', cost: 2e6, costResource: 'coin', unlock: '谢克尔', effect: { kind: 'factory', target: '硬币', multiplier: 2 } },
+      { name: '雅浦岛石币', cost: 1e7, costResource: 'coin', unlock: '谢克尔', effect: { kind: 'factory', target: '商品货币', multiplier: 101 } },
+      { name: '加洛林硬币', cost: 1e7, costResource: 'coin', unlock: '古罗马硬币', effect: { kind: 'factory', target: '硬币', multiplier: 2 } },
+      { name: '流通票据', cost: 2e7, costResource: 'coin', unlock: '高利贷', effect: { kind: 'factory', target: '硬币', multiplier: 2.5 } },
+      { name: '银行业', cost: 8e7, costResource: 'coin', unlock: '高利贷', effect: { kind: 'factory', target: '硬币', multiplier: 3 } },
+      { name: '币面图像', cost: 3e8, costResource: 'coin', unlock: '流通票据', effect: { kind: 'factory', target: '硬币', multiplier: 4 } },
+      { name: '存款贷款', cost: 1e12, costResource: 'coin', unlock: '银行业', effect: { kind: 'factory', target: '硬币', multiplier: 2.5 } },
+      { name: '假币', cost: 5e12, costResource: 'coin', unlock: '币面图像', effect: { kind: 'factory', target: '硬币', multiplier: 8 } },
+      { name: '股票市场', cost: 1e8, costResource: 'cash', unlock: '纸币', effect: { kind: 'factory', target: '纸币', multiplier: 3 } },
+      { name: '飞钱', cost: 1500, costResource: 'cash', unlock: '纸币', effect: { kind: 'factory', target: '纸币', multiplier: 2 } },
+      { name: '八里亚尔', cost: 7e6, costResource: 'cash', unlock: '纸币', effect: { kind: 'factory', target: '硬币', multiplier: 101 } },
+      { name: '中央银行', cost: 20000, costResource: 'cash', unlock: '纸币', effect: { kind: 'factory', target: '纸币', multiplier: 3 } },
+      { name: '信用', cost: 300000, costResource: 'cash', unlock: '纸币', effect: { kind: 'factory', target: '硬币', multiplier: 11 } },
+      { name: '奇普', cost: 750, costResource: 'cash', unlock: '纸币', effect: { kind: 'factory', target: '商品货币', multiplier: 1001 } },
+      { name: '金本位制', cost: 750000, costResource: 'cash', unlock: '中央银行', effect: { kind: 'factory', target: '纸币', multiplier: 4 } },
+      { name: '法定货币', cost: 3e6, costResource: 'cash', unlock: '金本位制', effect: { kind: 'factory', target: '纸币', multiplier: 4 } },
+      { name: '通货膨胀', cost: 3e11, costResource: 'cash', unlock: '存款贷款', effect: { kind: 'factory', target: '纸币', multiplier: 21 } },
+      { name: '投机泡沫', cost: 4e8, costResource: 'cash', unlock: '股票市场', effect: { kind: 'factory', target: '纸币', multiplier: 6 } },
+      { name: '网上银行', cost: 200000, costResource: 'credit', unlock: '电子货币', effect: { kind: 'factory', target: '电子货币', multiplier: 5 } },
+      { name: '支付卡', cost: 50000, costResource: 'credit', unlock: '电子货币', effect: { kind: 'factory', target: '电子货币', multiplier: 2 } },
+      { name: '信息安全', cost: 10000, costResource: 'credit', unlock: '电子货币', effect: { kind: 'factory', target: '电子货币', multiplier: 2 } },
+      { name: '税收', cost: 900, costResource: 'credit', unlock: '电子货币', effect: { kind: 'factory', target: '硬币', multiplier: 5001 } },
+      { name: '电子商务', cost: 6e6, costResource: 'credit', unlock: '网上银行', effect: { kind: 'factory', target: '电子货币', multiplier: 6 } },
+      { name: '电汇', cost: 5e7, costResource: 'credit', unlock: '网上银行', effect: { kind: 'factory', target: '电子货币', multiplier: 2.5 } },
+      { name: '移动支付', cost: 1.5e8, costResource: 'credit', unlock: '支付卡', effect: { kind: 'factory', target: '电子货币', multiplier: 4 } },
+      { name: 'ATM', cost: 500000, costResource: 'credit', unlock: '支付卡', effect: { kind: 'factory', target: '纸币', multiplier: 51 } },
+      { name: 'ETF', cost: 4e8, costResource: 'credit', unlock: '电子商务', effect: { kind: 'factory', target: '电子货币', multiplier: 3 } },
     ],
   },
   {
@@ -212,6 +286,7 @@ function parseUnlock(
 /** 生成可直接写入存档的预设状态。 */
 export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now = Date.now() }: { level?: number; badgePercent?: number; now?: number } = {}) {
   const baseLevel = preset.docLevel ?? PRESET_DOC_LEVEL;
+  const docGlobalAd = preset.docGlobalAd ?? PRESET_DOC_GLOBAL_AD;
   const safeLevel = Number.isInteger(level) && (level as number) >= 1 ? (level as number) : baseLevel;
   const safeBadge = Number.isFinite(badgePercent) && badgePercent >= 0 ? badgePercent : 0;
   const costScale = 4 ** (safeLevel - baseLevel);
@@ -260,7 +335,7 @@ export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now 
     id: factoryIdByName.get(factory.name),
     name: factory.name,
     price: presetNumber(factory.cost * costScale),
-    unit: presetNumber((factory.output / PRESET_DOC_GLOBAL_AD) * incomeScale),
+    unit: presetNumber((factory.output / docGlobalAd) * incomeScale),
     growth: preset.factoryGrowth ? String(preset.factoryGrowth) : '',
     owned: '0',
     outputResourceId: resolveResource(factory.outputResource),

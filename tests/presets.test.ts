@@ -6,10 +6,107 @@ import { planStateSpace } from '../src/core/statePlanner.ts';
 
 const preset = PRESETS[0];
 const anatomyPreset = PRESETS.find((item) => item.id === 'anatomy');
+const trustPreset = PRESETS.find((item) => item.id === 'trust');
 
 function findFactory(store, name) {
   return store.factories.find((factory) => factory.name === name);
 }
+
+describe('trust preset', () => {
+  it('imports four resources and the documented cross-resource factories', () => {
+    const store = buildPresetStore(trustPreset, { level: 1, badgePercent: 0 });
+    expect(store.resources.map((resource) => resource.emoji)).toEqual([
+      '🐚',
+      '🪙',
+      '💵',
+      '💳',
+    ]);
+    expect(store.factories.map((factory) => factory.name)).toEqual([
+      '商品货币',
+      '硬币',
+      '纸币',
+      '电子货币',
+    ]);
+    const shell = store.resources[0];
+    const coin = store.resources[1];
+    const cash = store.resources[2];
+    const credit = store.resources[3];
+    expect(findFactory(store, '商品货币')).toMatchObject({
+      price: '25',
+      unit: '1',
+      costResourceId: shell.id,
+      outputResourceId: shell.id,
+      requires: null,
+    });
+    expect(findFactory(store, '硬币')).toMatchObject({
+      price: '1.00B',
+      unit: '1',
+      costResourceId: shell.id,
+      outputResourceId: coin.id,
+    });
+    expect(findFactory(store, '纸币')).toMatchObject({
+      costResourceId: coin.id,
+      outputResourceId: cash.id,
+    });
+    expect(findFactory(store, '电子货币')).toMatchObject({
+      costResourceId: cash.id,
+      outputResourceId: credit.id,
+    });
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '冶金术').id,
+    ).toBe(findFactory(store, '硬币').requires.id);
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '银行业').id,
+    ).toBe(findFactory(store, '纸币').requires.id);
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '法定货币').id,
+    ).toBe(findFactory(store, '电子货币').requires.id);
+  });
+
+  it('keeps factory-effect upgrades and omits click-only upgrades', () => {
+    const store = buildPresetStore(trustPreset, { level: 1, badgePercent: 0 });
+    expect(store.upgrades).toHaveLength(43);
+    for (const name of ['渔猎采集', '赠送礼品', '定居', '专业分工']) {
+      expect(store.upgrades.some((upgrade) => upgrade.name === name)).toBe(false);
+    }
+    const debt = store.upgrades.find((upgrade) => upgrade.name === '债务');
+    const tax = store.upgrades.find((upgrade) => upgrade.name === '税收');
+    const qipu = store.upgrades.find((upgrade) => upgrade.name === '奇普');
+    const real = store.upgrades.find((upgrade) => upgrade.name === '八里亚尔');
+    expect(debt).toMatchObject({
+      cost: '125',
+      multiplier: '2.5',
+      targetFactoryId: findFactory(store, '商品货币').id,
+      requires: { type: 'factory', id: findFactory(store, '商品货币').id },
+    });
+    expect(tax).toMatchObject({
+      multiplier: '5.00K',
+      targetFactoryId: findFactory(store, '硬币').id,
+    });
+    expect(qipu).toMatchObject({
+      multiplier: '1.00K',
+      targetFactoryId: findFactory(store, '商品货币').id,
+    });
+    expect(real).toMatchObject({
+      multiplier: '101',
+      targetFactoryId: findFactory(store, '硬币').id,
+    });
+  });
+
+  it('uses the document as a reputation-1, no-ad baseline', () => {
+    const level1 = buildPresetStore(trustPreset, { level: 1, badgePercent: 0 });
+    const level2 = buildPresetStore(trustPreset, { level: 2, badgePercent: 0 });
+    expect(findFactory(level1, '商品货币')).toMatchObject({
+      price: '25',
+      unit: '1',
+    });
+    expect(findFactory(level2, '商品货币')).toMatchObject({
+      price: '100',
+      unit: '2',
+    });
+    expect(findFactory(level2, '硬币').price).toBe('4.00B');
+  });
+});
 
 describe('life anatomy preset', () => {
   it('imports two resources and cross-resource factories', () => {

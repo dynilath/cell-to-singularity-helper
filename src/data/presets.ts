@@ -30,6 +30,7 @@ interface PresetFactory {
   costResource?: string;
   outputResource?: string;
   unlock?: string;
+  growth?: number;
 }
 
 interface PresetUpgradeEffect {
@@ -126,17 +127,17 @@ export const PRESETS: Preset[] = [
     factoryGrowth: 1.15,
     notes: [
       '文档未标注声望和全局广告基准；这里暂按声望 1、产出不含全局广告录入，导入时请按游戏实际声望调整。',
-      '文档尚未填写完整，当前只导入已列出的 5 个工厂和 47 个工厂效果升级。',
+      '文档尚未填写完整，当前只导入已列出的 5 个工厂和 54 个工厂效果升级。',
       '点击收益升级「渔猎采集 / 赠送礼品 / 定居 / 专业分工」暂未建模；因此「商品货币」暂不设置「专业分工」前置。',
-      '工厂价格增长倍率未在文档中给出，暂用 1.15。',
+      '工厂价格增长倍率按文档逐项录入：商品货币 1.07、硬币 1.09、纸币 1.11、电子货币 1.13、未来货币 1.15。',
       '文档里的解锁条件已转成锁定前置；工厂前置要求该工厂至少 1 台。',
     ],
     factories: [
-      { name: '商品货币', cost: 25, output: 1, costResource: 'shell', outputResource: 'shell' },
-      { name: '硬币', cost: 1e9, output: 1, costResource: 'shell', outputResource: 'coin', unlock: '冶金术' },
-      { name: '纸币', cost: 1e9, output: 1, costResource: 'coin', outputResource: 'cash', unlock: '银行业' },
-      { name: '电子货币', cost: 1e9, output: 1, costResource: 'cash', outputResource: 'credit', unlock: '法定货币' },
-      { name: '未来货币', cost: 1e9, output: 100000, costResource: 'credit', outputResource: 'credit', unlock: '移动支付' },
+      { name: '商品货币', cost: 25, output: 1, costResource: 'shell', outputResource: 'shell', growth: 1.07 },
+      { name: '硬币', cost: 1e9, output: 1, costResource: 'shell', outputResource: 'coin', unlock: '冶金术', growth: 1.09 },
+      { name: '纸币', cost: 1e9, output: 1, costResource: 'coin', outputResource: 'cash', unlock: '银行业', growth: 1.11 },
+      { name: '电子货币', cost: 1e9, output: 1, costResource: 'cash', outputResource: 'credit', unlock: '法定货币', growth: 1.13 },
+      { name: '未来货币', cost: 1e9, output: 100000, costResource: 'credit', outputResource: 'credit', unlock: '移动支付', growth: 1.15 },
     ],
     upgrades: [
       { name: '债务', cost: 125, costResource: 'shell', unlock: '商品货币', effect: { kind: 'factory', target: '商品货币', multiplier: 2.5 } },
@@ -186,6 +187,13 @@ export const PRESETS: Preset[] = [
       { name: '算法交易', cost: 3e11, costResource: 'credit', unlock: '未来货币', effect: { kind: 'factory', target: '电子货币', multiplier: 6 } },
       { name: '区块链', cost: 2e9, costResource: 'credit', unlock: '未来货币', effect: { kind: 'factory', target: '未来货币', multiplier: 3 } },
       { name: '欧元', cost: 2.5e9, costResource: 'credit', unlock: '未来货币', effect: { kind: 'factory', target: '纸币', multiplier: 1001 } },
+      { name: '加密货币', cost: 1e11, costResource: 'credit', unlock: '区块链', effect: { kind: 'factory', target: '未来货币', multiplier: 3 } },
+      { name: '不受监管', cost: 2e12, costResource: 'credit', unlock: '加密货币', effect: { kind: 'factory', target: '未来货币', multiplier: 3.5 } },
+      { name: '虚拟货币', cost: 7.5e11, costResource: 'credit', unlock: '算法交易', effect: { kind: 'factory', target: '未来货币', multiplier: 2.5 } },
+      { name: '接下来是什么？', cost: 9e11, costResource: 'credit', unlock: '虚拟货币', effect: { kind: 'factory', target: '未来货币', multiplier: 3 } },
+      { name: '同一个世界，同一种货币？', cost: 1e13, costResource: 'credit', unlock: '接下来是什么？', effect: { kind: 'factory', target: '未来货币', multiplier: 3 } },
+      { name: '去中心化的乌托邦？', cost: 4e13, costResource: 'credit', unlock: '同一个世界，同一种货币？', effect: { kind: 'factory', target: '未来货币', multiplier: 3 } },
+      { name: '后稀缺社会？', cost: 1e14, costResource: 'credit', unlock: '去中心化的乌托邦？', effect: { kind: 'factory', target: '未来货币', multiplier: 2 } },
     ],
   },
   {
@@ -341,7 +349,7 @@ export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now 
     name: factory.name,
     price: presetNumber(factory.cost * costScale),
     unit: presetNumber((factory.output / docGlobalAd) * incomeScale),
-    growth: preset.factoryGrowth ? String(preset.factoryGrowth) : '',
+    growth: factory.growth ? String(factory.growth) : preset.factoryGrowth ? String(preset.factoryGrowth) : '',
     owned: '0',
     outputResourceId: resolveResource(factory.outputResource),
     costResourceId: resolveResource(factory.costResource),

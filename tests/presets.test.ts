@@ -35,6 +35,7 @@ describe('trust preset', () => {
     expect(findFactory(store, '商品货币')).toMatchObject({
       price: '25',
       unit: '1',
+      growth: '1.07',
       costResourceId: shell.id,
       outputResourceId: shell.id,
       requires: null,
@@ -42,20 +43,24 @@ describe('trust preset', () => {
     expect(findFactory(store, '硬币')).toMatchObject({
       price: '1.00B',
       unit: '1',
+      growth: '1.09',
       costResourceId: shell.id,
       outputResourceId: coin.id,
     });
     expect(findFactory(store, '纸币')).toMatchObject({
+      growth: '1.11',
       costResourceId: coin.id,
       outputResourceId: cash.id,
     });
     expect(findFactory(store, '电子货币')).toMatchObject({
+      growth: '1.13',
       costResourceId: cash.id,
       outputResourceId: credit.id,
     });
     expect(findFactory(store, '未来货币')).toMatchObject({
       price: '1.00B',
       unit: '100K',
+      growth: '1.15',
       costResourceId: credit.id,
       outputResourceId: credit.id,
       requires: { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '移动支付').id },
@@ -73,7 +78,7 @@ describe('trust preset', () => {
 
   it('keeps factory-effect upgrades and omits click-only upgrades', () => {
     const store = buildPresetStore(trustPreset, { level: 1, badgePercent: 0 });
-    expect(store.upgrades).toHaveLength(47);
+    expect(store.upgrades).toHaveLength(54);
     for (const name of ['渔猎采集', '赠送礼品', '定居', '专业分工']) {
       expect(store.upgrades.some((upgrade) => upgrade.name === name)).toBe(false);
     }
@@ -106,6 +111,12 @@ describe('trust preset', () => {
     expect(store.upgrades.find((upgrade) => upgrade.name === '欧元')).toMatchObject({
       multiplier: '1.00K',
       targetFactoryId: findFactory(store, '纸币').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '后稀缺社会？')).toMatchObject({
+      cost: '100T',
+      multiplier: '2',
+      targetFactoryId: findFactory(store, '未来货币').id,
+      requires: { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '去中心化的乌托邦？').id },
     });
   });
 

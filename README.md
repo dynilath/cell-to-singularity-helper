@@ -21,3 +21,14 @@ pnpm verify
 
 - [生命解剖学](docs/presets/生命解剖学.md)
 - [面对恐惧](docs/presets/微型探索%20面对恐惧.md)
+- [信任有价](docs/presets/信任有价.md)
+
+```text
+docs/
+├── 使用说明.md
+├── 算法与策略.md
+└── presets/
+    ├── 生命解剖学.md
+    ├── 微型探索 面对恐惧.md
+    └── 信任有价.md
+```

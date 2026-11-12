@@ -26,6 +26,7 @@ describe('trust preset', () => {
       '硬币',
       '纸币',
       '电子货币',
+      '未来货币',
     ]);
     const shell = store.resources[0];
     const coin = store.resources[1];
@@ -52,6 +53,13 @@ describe('trust preset', () => {
       costResourceId: cash.id,
       outputResourceId: credit.id,
     });
+    expect(findFactory(store, '未来货币')).toMatchObject({
+      price: '1.00B',
+      unit: '100K',
+      costResourceId: credit.id,
+      outputResourceId: credit.id,
+      requires: { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '移动支付').id },
+    });
     expect(
       store.upgrades.find((upgrade) => upgrade.name === '冶金术').id,
     ).toBe(findFactory(store, '硬币').requires.id);
@@ -65,7 +73,7 @@ describe('trust preset', () => {
 
   it('keeps factory-effect upgrades and omits click-only upgrades', () => {
     const store = buildPresetStore(trustPreset, { level: 1, badgePercent: 0 });
-    expect(store.upgrades).toHaveLength(43);
+    expect(store.upgrades).toHaveLength(47);
     for (const name of ['渔猎采集', '赠送礼品', '定居', '专业分工']) {
       expect(store.upgrades.some((upgrade) => upgrade.name === name)).toBe(false);
     }
@@ -90,6 +98,14 @@ describe('trust preset', () => {
     expect(real).toMatchObject({
       multiplier: '101',
       targetFactoryId: findFactory(store, '硬币').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '区块链')).toMatchObject({
+      multiplier: '3',
+      targetFactoryId: findFactory(store, '未来货币').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '欧元')).toMatchObject({
+      multiplier: '1.00K',
+      targetFactoryId: findFactory(store, '纸币').id,
     });
   });
 

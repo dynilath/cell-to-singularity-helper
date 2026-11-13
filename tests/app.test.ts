@@ -138,7 +138,7 @@ describe('v6 boot', () => {
     expect(context.document.querySelectorAll('#resource-rows .res-row')).toHaveLength(1);
     expect(context.document.querySelectorAll('#factory-rows .fac-row')).toHaveLength(1);
     expect(context.document.getElementById('group-tabs')).toBeNull();
-    expect(context.document.querySelector('#resource-rows .res-emoji').value).toBe('🌱');
+    expect(context.document.querySelector('#resource-rows .res-emoji-toggle').textContent).toBe('🌱');
 
     const head = context.document.querySelector('#factory-rows .fac-head');
     expect(head.querySelector('[data-contribution-for]')).not.toBeNull();
@@ -326,7 +326,7 @@ describe('v6 boot', () => {
     const { document } = context;
     expect(document.getElementById('global-growth').tabIndex).toBe(-1);
     expect(document.getElementById('offline-rate').tabIndex).toBe(-1);
-    expect(document.querySelector('.res-emoji').tabIndex).toBe(-1);
+    expect(document.querySelector('.res-emoji-toggle').tabIndex).toBe(-1);
     for (const picker of document.querySelectorAll('#factory-rows .res-picker')) {
       expect(picker.tabIndex).toBe(-1);
     }
@@ -1429,10 +1429,12 @@ describe('resources and notation', () => {
     click(context, '#add-resource');
     expect(context.document.querySelectorAll('#resource-rows .res-row')).toHaveLength(2);
 
-    const emoji = context.document.querySelectorAll('#resource-rows .res-emoji')[1];
-    expect(emoji.value).toBe(RESOURCE_EMOJIS[1]);
-    emoji.value = '💎';
-    emoji.dispatchEvent(new context.window.Event('change', { bubbles: true }));
+    const toggles = context.document.querySelectorAll('#resource-rows .res-emoji-toggle');
+    expect(toggles[1].textContent).toBe(RESOURCE_EMOJIS[1]);
+    toggles[1].click();
+    const panel = context.document.querySelectorAll('#resource-rows .res-emoji-panel')[1];
+    expect(panel.classList.contains('hidden')).toBe(false);
+    panel.querySelector('[data-emoji="💎"]').click();
     expect(savedStore(context).resources[1].emoji).toBe('💎');
 
     const optionText = [
@@ -1513,8 +1515,8 @@ describe('resources and notation', () => {
     expect(store.preset).toMatchObject({ id: 'anatomy', level: 1, badgePercent: 0 });
     expect(context.document.querySelectorAll('#resource-rows .res-row')).toHaveLength(2);
     expect(
-      [...context.document.querySelectorAll('#resource-rows .res-emoji')].map(
-        (select) => select.value,
+      [...context.document.querySelectorAll('#resource-rows .res-emoji-toggle')].map(
+        (toggle) => toggle.textContent,
       ),
     ).toEqual(['🔵', '🔴']);
   });

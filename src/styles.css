@@ -873,11 +873,50 @@ select:focus-visible {
   width: 100%;
 }
 
-.res-emoji {
+.res-emoji-picker {
+  position: relative;
+  width: 100%;
+}
+
+.res-emoji-toggle {
   width: 100%;
   padding: 7px 2px;
   font-size: 1.1rem;
   text-align: center;
+  cursor: pointer;
+}
+
+.res-emoji-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 34px);
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid rgba(80, 105, 145, 0.8);
+  border-radius: 10px;
+  background: #111a2b;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.res-emoji-panel.hidden {
+  display: none;
+}
+
+.res-emoji-choice {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.res-emoji-choice.selected {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
 }
 
 @media (max-width: 700px) {

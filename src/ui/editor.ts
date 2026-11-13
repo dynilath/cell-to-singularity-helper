@@ -53,6 +53,50 @@ function field(document, labelText, control, className = '') {
   return wrapper;
 }
 
+/** 资源图标选择：按钮打开图标网格面板，不使用原生下拉框。 */
+function emojiPicker(document, options, value, onSelect) {
+  const wrapper = element(document, 'div', 'res-emoji-picker');
+  const toggle = element(document, 'button', 'res-emoji-toggle', value);
+  toggle.type = 'button';
+  toggle.tabIndex = -1;
+  toggle.setAttribute('aria-label', `选择资源图标：${value}`);
+  toggle.title = `选择资源图标：${value}`;
+  const panel = element(document, 'div', 'res-emoji-panel hidden');
+  panel.setAttribute('role', 'listbox');
+  panel.setAttribute('aria-label', '资源图标');
+
+  for (const option of options) {
+    const choice = element(document, 'button', 'res-emoji-choice', option);
+    choice.type = 'button';
+    choice.dataset.emoji = option;
+    choice.title = option;
+    choice.setAttribute('role', 'option');
+    choice.setAttribute('aria-selected', String(option === value));
+    if (option === value) choice.classList.add('selected');
+    choice.addEventListener('click', (event) => {
+      event.stopPropagation();
+      panel.classList.add('hidden');
+      toggle.setAttribute('aria-expanded', 'false');
+      onSelect(option);
+    });
+    panel.append(choice);
+  }
+
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const opening = panel.classList.contains('hidden');
+    for (const other of document.querySelectorAll('.res-emoji-panel')) {
+      if (other !== panel) other.classList.add('hidden');
+    }
+    panel.classList.toggle('hidden', !opening);
+    toggle.setAttribute('aria-expanded', String(opening));
+  });
+
+  wrapper.append(toggle, panel);
+  return wrapper;
+}
+
 function withResource(document, labelText, input, picker) {
   const wrapper = element(document, 'div');
   const label = element(document, 'label', '', labelText);
@@ -210,18 +254,16 @@ export function createEditor({
 
     group.resources.forEach((resource) => {
       const row = element(document, 'div', 'res-row');
-      const emoji = selectInput(
+      const emoji = emojiPicker(
         document,
-        RESOURCE_EMOJIS.map((value) => ({ id: value, name: value })),
+        RESOURCE_EMOJIS,
         resource.emoji,
+        (value) => {
+          resource.emoji = value;
+          renderAll();
+          signalChange();
+        },
       );
-      emoji.className = 'res-emoji';
-      emoji.tabIndex = -1; // 图标下拉不进入 Tab 顺序
-      emoji.addEventListener('change', () => {
-        resource.emoji = emoji.value;
-        renderAll();
-        signalChange();
-      });
 
       const amount = numberInput(document, resource.amount, '当前数量');
       amount.dataset.resourceAmountFor = resource.id;

@@ -7,10 +7,86 @@ import { planStateSpace } from '../src/core/statePlanner.ts';
 const preset = PRESETS[0];
 const anatomyPreset = PRESETS.find((item) => item.id === 'anatomy');
 const trustPreset = PRESETS.find((item) => item.id === 'trust');
+const immutablePreset = PRESETS.find((item) => item.id === 'immutable');
 
 function findFactory(store, name) {
   return store.factories.find((factory) => factory.name === name);
 }
+
+describe('immutable preset', () => {
+  it('imports the mineral and rock production chain', () => {
+    const store = buildPresetStore(immutablePreset, { level: 1, badgePercent: 0 });
+    expect(store.resources.map((resource) => resource.emoji)).toEqual(['🧊', '🪨']);
+    expect(immutablePreset.resources.map((resource) => resource.name)).toEqual([
+      '矿物质',
+      '岩石',
+    ]);
+    expect(store.factories.map((factory) => factory.name)).toEqual([
+      '矿物',
+      '火成岩',
+      '沉积岩',
+      '变质岩',
+    ]);
+    expect(findFactory(store, '矿物')).toMatchObject({
+      price: '150',
+      unit: '2',
+      growth: '1.15',
+      requires: null,
+    });
+    expect(findFactory(store, '火成岩')).toMatchObject({
+      price: '50.0K',
+      unit: '1',
+      growth: '1.15',
+    });
+    expect(findFactory(store, '沉积岩')).toMatchObject({
+      price: '10.0M',
+      unit: '250',
+    });
+    expect(findFactory(store, '变质岩')).toMatchObject({
+      price: '300M',
+      unit: '100K',
+    });
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '岩浆').id,
+    ).toBe(findFactory(store, '火成岩').requires.id);
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '沙砾').id,
+    ).toBe(findFactory(store, '沉积岩').requires.id);
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '闪长岩').id,
+    ).toBe(findFactory(store, '变质岩').requires.id);
+  });
+
+  it('imports factory upgrades and omits the click-only origin upgrade', () => {
+    const store = buildPresetStore(immutablePreset, { level: 1, badgePercent: 0 });
+    expect(store.upgrades).toHaveLength(19);
+    expect(store.upgrades.some((upgrade) => upgrade.name === '地球起源')).toBe(false);
+    expect(store.upgrades.find((upgrade) => upgrade.name === '橄榄石')).toMatchObject({
+      multiplier: '1.5',
+      targetFactoryId: findFactory(store, '矿物').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '火山渣')).toMatchObject({
+      multiplier: '301',
+      targetFactoryId: findFactory(store, '火成岩').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '方解石')).toMatchObject({
+      multiplier: '3.5',
+      targetFactoryId: findFactory(store, '矿物').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '板岩')).toMatchObject({
+      multiplier: '2',
+      targetFactoryId: findFactory(store, '变质岩').id,
+    });
+  });
+
+  it('uses a reputation-1, no-ad document baseline', () => {
+    const level1 = buildPresetStore(immutablePreset, { level: 1, badgePercent: 0 });
+    const level2 = buildPresetStore(immutablePreset, { level: 2, badgePercent: 0 });
+    expect(findFactory(level1, '矿物')).toMatchObject({ price: '150', unit: '2' });
+    expect(findFactory(level2, '矿物')).toMatchObject({ price: '600', unit: '4' });
+    expect(findFactory(level2, '变质岩').price).toBe('1.20B');
+  });
+});
 
 describe('trust preset', () => {
   it('imports four resources and the documented cross-resource factories', () => {

@@ -14,29 +14,31 @@ function findFactory(store, name) {
 }
 
 describe('immutable preset', () => {
-  it('imports the mineral and rock production chain', () => {
+  it('imports the three resources and six factories', () => {
     const store = buildPresetStore(immutablePreset, { level: 1, badgePercent: 0 });
-    expect(store.resources.map((resource) => resource.emoji)).toEqual(['🧊', '🪨']);
+    expect(store.resources.map((resource) => resource.emoji)).toEqual(['🧊', '🪨', '🟣']);
     expect(immutablePreset.resources.map((resource) => resource.name)).toEqual([
       '矿物质',
       '岩石',
+      '水晶',
     ]);
     expect(store.factories.map((factory) => factory.name)).toEqual([
       '矿物',
       '火成岩',
       '沉积岩',
       '变质岩',
+      '晶体',
+      '宝石',
     ]);
+    expect(store.factories.every((factory) => factory.growth === '1.15')).toBe(true);
     expect(findFactory(store, '矿物')).toMatchObject({
       price: '150',
       unit: '2',
-      growth: '1.15',
       requires: null,
     });
     expect(findFactory(store, '火成岩')).toMatchObject({
       price: '50.0K',
       unit: '1',
-      growth: '1.15',
     });
     expect(findFactory(store, '沉积岩')).toMatchObject({
       price: '10.0M',
@@ -46,20 +48,38 @@ describe('immutable preset', () => {
       price: '300M',
       unit: '100K',
     });
+    expect(findFactory(store, '晶体')).toMatchObject({
+      price: '400B',
+      unit: '1',
+      costResourceId: store.resources[0].id,
+      outputResourceId: store.resources[2].id,
+    });
+    expect(findFactory(store, '宝石')).toMatchObject({
+      price: '3.00T',
+      unit: '100M',
+      costResourceId: store.resources[2].id,
+      outputResourceId: store.resources[2].id,
+    });
     expect(
       store.upgrades.find((upgrade) => upgrade.name === '岩浆').id,
     ).toBe(findFactory(store, '火成岩').requires.id);
     expect(
-      store.upgrades.find((upgrade) => upgrade.name === '沙砾').id,
+      store.upgrades.find((upgrade) => upgrade.name === '沙粒').id,
     ).toBe(findFactory(store, '沉积岩').requires.id);
     expect(
       store.upgrades.find((upgrade) => upgrade.name === '闪长岩').id,
     ).toBe(findFactory(store, '变质岩').requires.id);
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '萤石').id,
+    ).toBe(findFactory(store, '晶体').requires.id);
+    expect(
+      store.upgrades.find((upgrade) => upgrade.name === '钻石').id,
+    ).toBe(findFactory(store, '宝石').requires.id);
   });
 
-  it('imports factory upgrades and omits the click-only origin upgrade', () => {
+  it('imports all factory upgrades and omits the click-only origin upgrade', () => {
     const store = buildPresetStore(immutablePreset, { level: 1, badgePercent: 0 });
-    expect(store.upgrades).toHaveLength(19);
+    expect(store.upgrades).toHaveLength(47);
     expect(store.upgrades.some((upgrade) => upgrade.name === '地球起源')).toBe(false);
     expect(store.upgrades.find((upgrade) => upgrade.name === '橄榄石')).toMatchObject({
       multiplier: '1.5',
@@ -76,6 +96,15 @@ describe('immutable preset', () => {
     expect(store.upgrades.find((upgrade) => upgrade.name === '板岩')).toMatchObject({
       multiplier: '2',
       targetFactoryId: findFactory(store, '变质岩').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '大理石')).toMatchObject({
+      multiplier: '1.75',
+      targetFactoryId: findFactory(store, '变质岩').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '自然之美')).toMatchObject({
+      cost: '2.50Sx',
+      multiplier: '2',
+      targetFactoryId: findFactory(store, '沉积岩').id,
     });
   });
 

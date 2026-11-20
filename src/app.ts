@@ -40,7 +40,11 @@ const RECOMPUTE_DELAY_MS = 300;
 const TYPING_RECOMPUTE_DELAY_MS = 900;
 const TICK_MS = 500;
 
-export function createApp({ document, window }) {
+export function createApp({
+  document,
+  window,
+  reload = () => window.location.reload(),
+}) {
   const storage = window.localStorage;
   const store = loadStore(storage);
   const settings = loadSettings(storage);
@@ -993,6 +997,34 @@ export function createApp({ document, window }) {
     persistStore();
   }
 
+  function setupReset() {
+    const button = byId(document, 'reset-data');
+    button.addEventListener('click', () => {
+      const confirmed =
+        typeof window.confirm === 'function'
+          ? window.confirm(
+              '确定重置全部数据？\n\n将清空资源、工厂、升级、计划、提醒、预设状态和设置，恢复初始状态，且不可撤销。',
+            )
+          : true;
+      if (!confirmed) return;
+      try {
+        const keys = [];
+        for (let index = 0; index < storage.length; index += 1) {
+          const key = storage.key(index);
+          if (key?.startsWith('cts_')) keys.push(key);
+        }
+        for (const key of keys) storage.removeItem(key);
+      } catch {
+        // localStorage 不可用时仍然尝试刷新页面。
+      }
+      try {
+        reload();
+      } catch {
+        // 某些嵌入式环境不允许刷新；数据已清空，下次打开会使用初始状态。
+      }
+    });
+  }
+
   function setupPreferences() {
     notationSelect = byId(document, 'notation');
     notationSelect.value = settings.notation;
@@ -1103,6 +1135,7 @@ export function createApp({ document, window }) {
     sanitizeLoadedText();
     saveStore(storage, store);
     setupPreferences();
+    setupReset();
     renderAll();
     checkDueReminders(true);
     refreshDrawer();

@@ -402,6 +402,15 @@ button.armed {
   color: #2a0505;
 }
 
+button.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+button.danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+
 button.small {
   padding: 7px 12px;
   font-size: 0.82rem;

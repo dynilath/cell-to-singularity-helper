@@ -45,7 +45,7 @@ function sampleStore(overrides = {}) {
   };
 }
 
-function boot(store = sampleStore(), extraSeed = {}) {
+function boot(store = sampleStore(), extraSeed = {}, appOptions = {}) {
   const dom = new JSDOM(HTML, {
     url: 'http://localhost/',
     runScripts: 'outside-only',
@@ -59,7 +59,7 @@ function boot(store = sampleStore(), extraSeed = {}) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   for (const [key, value] of Object.entries(extraSeed)) window.localStorage.setItem(key, value);
 
-  const app = createApp({ document, window });
+  const app = createApp({ document, window, ...appOptions });
   app.start();
 
   const context = { dom, window, document, app };
@@ -1556,6 +1556,30 @@ describe('resources and notation', () => {
     expect(factoryInputs(context)[1].value).toBe('100万');
     expect(upgradeInputs(context)[1].value).toBe('100万');
     expect(context.window.localStorage.getItem(SETTING_KEYS.notation)).toBe('chinese');
+  });
+});
+
+describe('reset', () => {
+  it('does nothing when the confirmation is cancelled', () => {
+    const context = boot();
+    context.window.confirm = vi.fn(() => false);
+    const before = context.window.localStorage.length;
+    click(context, '#reset-data');
+    expect(context.window.confirm).toHaveBeenCalled();
+    expect(context.window.localStorage.length).toBe(before);
+  });
+
+  it('removes every cts key and reloads after confirmation', () => {
+    const reload = vi.fn();
+    const context = boot(sampleStore(), {}, { reload });
+    context.window.confirm = vi.fn(() => true);
+    click(context, '#reset-data');
+    expect(reload).toHaveBeenCalled();
+    const keys = [];
+    for (let index = 0; index < context.window.localStorage.length; index += 1) {
+      keys.push(context.window.localStorage.key(index));
+    }
+    expect(keys.filter((key) => key?.startsWith('cts_'))).toEqual([]);
   });
 });
 

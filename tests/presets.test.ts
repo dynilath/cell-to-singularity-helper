@@ -8,6 +8,7 @@ const preset = PRESETS[0];
 const anatomyPreset = PRESETS.find((item) => item.id === 'anatomy');
 const trustPreset = PRESETS.find((item) => item.id === 'trust');
 const immutablePreset = PRESETS.find((item) => item.id === 'immutable');
+const universePreset = PRESETS.find((item) => item.id === 'universe');
 
 function findFactory(store, name) {
   return store.factories.find((factory) => factory.name === name);
@@ -237,6 +238,69 @@ describe('trust preset', () => {
       unit: '2',
     });
     expect(findFactory(level2, '硬币').price).toBe('4.00B');
+  });
+});
+
+describe('universe preset', () => {
+  it('imports one honeycomb resource and the telescope chain', () => {
+    const store = buildPresetStore(universePreset, { level: 1, badgePercent: 0 });
+    expect(RESOURCE_EMOJIS).toContain('🟨');
+    expect(store.resources.map((resource) => resource.emoji)).toEqual(['🟨']);
+    expect(store.factories.map((factory) => factory.name)).toEqual([
+      '地面望远镜',
+      '哈勃望远镜',
+      '詹姆斯·韦布望远镜',
+      '研发',
+      '建造',
+      '发射',
+    ]);
+    expect(store.factories.every((factory) => factory.growth === '1.15')).toBe(true);
+    expect(findFactory(store, '地面望远镜')).toMatchObject({
+      price: '15',
+      unit: '0.5',
+      requires: null,
+    });
+    expect(findFactory(store, '哈勃望远镜').requires.id).toBe(
+      store.upgrades.find((upgrade) => upgrade.name === '太空望远镜').id,
+    );
+    expect(findFactory(store, '詹姆斯·韦布望远镜').requires.id).toBe(
+      store.upgrades.find((upgrade) => upgrade.name === '哈勃继任者').id,
+    );
+    expect(findFactory(store, '研发').requires.id).toBe(
+      store.upgrades.find((upgrade) => upgrade.name === '任务目标').id,
+    );
+    expect(findFactory(store, '建造').requires.id).toBe(
+      store.upgrades.find((upgrade) => upgrade.name === '经费').id,
+    );
+    expect(findFactory(store, '发射').requires.id).toBe(
+      store.upgrades.find((upgrade) => upgrade.name === '推迟发射').id,
+    );
+  });
+
+  it('imports the factory-effect upgrades and omits the placeholder origin upgrade', () => {
+    const store = buildPresetStore(universePreset, { level: 1, badgePercent: 0 });
+    expect(store.upgrades).toHaveLength(34);
+    expect(store.upgrades.some((upgrade) => upgrade.name === '仰望星空')).toBe(false);
+    expect(store.upgrades.find((upgrade) => upgrade.name === '太空望远镜')).toMatchObject({
+      multiplier: '2',
+      targetFactoryId: findFactory(store, '地面望远镜').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '哈勃继任者')).toMatchObject({
+      multiplier: '1.5',
+      targetFactoryId: findFactory(store, '哈勃望远镜').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '命名')).toMatchObject({
+      multiplier: '2',
+      targetFactoryId: findFactory(store, '詹姆斯·韦布望远镜').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '地面支持')).toMatchObject({
+      multiplier: '1.00K',
+      targetFactoryId: findFactory(store, '詹姆斯·韦布望远镜').id,
+    });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '第一批图像')).toMatchObject({
+      multiplier: '2',
+      targetFactoryId: findFactory(store, '发射').id,
+    });
   });
 });
 

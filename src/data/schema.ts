@@ -65,6 +65,7 @@ export const RESOURCE_EMOJIS = Object.freeze([
   '🧊',
   '🪨',
   '🟣',
+  '🟨',
 ]);
 
 let idSequence = 0;

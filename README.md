@@ -23,6 +23,7 @@ pnpm verify
 - [面对恐惧](docs/presets/微型探索%20面对恐惧.md)
 - [一成不变](docs/presets/一成不变的.md)
 - [信任有价](docs/presets/信任有价.md)
+- [展开宇宙](docs/presets/展开宇宙.md)
 
 ```text
 docs/
@@ -32,5 +33,6 @@ docs/
     ├── 生命解剖学.md
     ├── 微型探索 面对恐惧.md
     ├── 一成不变的.md
-    └── 信任有价.md
+    ├── 信任有价.md
+    └── 展开宇宙.md
 ```

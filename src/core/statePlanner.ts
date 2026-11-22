@@ -119,6 +119,10 @@ function findLockedTarget(state: PlannerState): Target | null {
   const upgradeById = new Map(state.upgrades.map((item) => [item.id, item]));
   const requiredFactories = new Map<string, number>();
   const visited = new Set<string>();
+  const requirementsOf = (item) => [
+    ...(item.requires ? [item.requires] : []),
+    ...(item.requiresAll ?? []),
+  ];
 
   const addUpgradeCandidate = (upgradeId: string) => {
     const upgrade = upgradeById.get(upgradeId);
@@ -157,14 +161,16 @@ function findLockedTarget(state: PlannerState): Target | null {
     const upgrade = upgradeById.get(id);
     if (!upgrade || upgrade.purchased) return;
     addFactory(upgrade.targetFactoryId, 1);
-    if (upgrade.requires?.type === 'upgrade') {
-      const required = upgradeById.get(upgrade.requires.id);
-      if (required && !required.purchased) {
-        if (upgradeActionable(state, required.id)) addUpgradeCandidate(required.id);
-        else visitUpgrade(required.id);
+    for (const requirement of requirementsOf(upgrade)) {
+      if (requirement.type === 'upgrade') {
+        const required = upgradeById.get(requirement.id);
+        if (required && !required.purchased) {
+          if (upgradeActionable(state, required.id)) addUpgradeCandidate(required.id);
+          else visitUpgrade(required.id);
+        }
+      } else if (requirement.type === 'factory') {
+        addFactory(requirement.id, Math.max(1, requirement.owned ?? 1));
       }
-    } else if (upgrade.requires?.type === 'factory') {
-      addFactory(upgrade.requires.id, Math.max(1, upgrade.requires.owned ?? 1));
     }
   };
 
@@ -177,14 +183,16 @@ function findLockedTarget(state: PlannerState): Target | null {
     if (factoryActionable(state, id)) addFactoryCandidate(id, desired);
     if (visited.has(key)) return;
     visited.add(key);
-    if (factory.requires?.type === 'upgrade') {
-      const required = upgradeById.get(factory.requires.id);
-      if (required && !required.purchased) {
-        if (upgradeActionable(state, required.id)) addUpgradeCandidate(required.id);
-        else visitUpgrade(required.id);
+    for (const requirement of requirementsOf(factory)) {
+      if (requirement.type === 'upgrade') {
+        const required = upgradeById.get(requirement.id);
+        if (required && !required.purchased) {
+          if (upgradeActionable(state, required.id)) addUpgradeCandidate(required.id);
+          else visitUpgrade(required.id);
+        }
+      } else if (requirement.type === 'factory') {
+        addFactory(requirement.id, Math.max(1, requirement.owned ?? 1));
       }
-    } else if (factory.requires?.type === 'factory') {
-      addFactory(factory.requires.id, Math.max(1, factory.requires.owned ?? 1));
     }
   }
 
@@ -246,6 +254,10 @@ function buildContext(
   const requiredUpgradeIds = new Set<string>();
   const factoryById = new Map(state.factories.map((factory) => [factory.id, factory]));
   const upgradeById = new Map(state.upgrades.map((upgrade) => [upgrade.id, upgrade]));
+  const requirementsOf = (item) => [
+    ...(item.requires ? [item.requires] : []),
+    ...(item.requiresAll ?? []),
+  ];
 
   function addFactory(id: string, requiredOwned = 1) {
     const factory = factoryById.get(id);
@@ -254,11 +266,13 @@ function buildContext(
     factoryIds.add(id);
     requiredFactories.set(id, Math.max(requiredFactories.get(id) ?? 0, requiredOwned));
     if (alreadyIncluded) return;
-    if (factory.requires?.type === 'factory') {
-      addFactory(factory.requires.id, Math.max(1, factory.requires.owned ?? 1));
-    } else if (factory.requires?.type === 'upgrade') {
-      requiredUpgradeIds.add(factory.requires.id);
-      addUpgrade(factory.requires.id);
+    for (const requirement of requirementsOf(factory)) {
+      if (requirement.type === 'factory') {
+        addFactory(requirement.id, Math.max(1, requirement.owned ?? 1));
+      } else if (requirement.type === 'upgrade') {
+        requiredUpgradeIds.add(requirement.id);
+        addUpgrade(requirement.id);
+      }
     }
   }
 
@@ -267,11 +281,13 @@ function buildContext(
     if (!upgrade || upgrade.purchased || upgradeIds.has(id)) return;
     upgradeIds.add(id);
     addFactory(upgrade.targetFactoryId, 1);
-    if (upgrade.requires?.type === 'factory') {
-      addFactory(upgrade.requires.id, Math.max(1, upgrade.requires.owned ?? 1));
-    } else if (upgrade.requires?.type === 'upgrade') {
-      requiredUpgradeIds.add(upgrade.requires.id);
-      addUpgrade(upgrade.requires.id);
+    for (const requirement of requirementsOf(upgrade)) {
+      if (requirement.type === 'factory') {
+        addFactory(requirement.id, Math.max(1, requirement.owned ?? 1));
+      } else if (requirement.type === 'upgrade') {
+        requiredUpgradeIds.add(requirement.id);
+        addUpgrade(requirement.id);
+      }
     }
   }
 

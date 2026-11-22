@@ -213,6 +213,11 @@ function normalizeRequirement(raw) {
   };
 }
 
+function normalizeRequirementList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeRequirement).filter(Boolean);
+}
+
 function normalizeFactory(raw, index, resourceIds) {
   const record = isRecord(raw) ? raw : {};
   const fallbackResource = resourceIds[0] ?? '';
@@ -234,6 +239,9 @@ function normalizeFactory(raw, index, resourceIds) {
     costResourceId,
     active: record.active !== false,
     requires: normalizeRequirement(record.requires),
+    ...(normalizeRequirementList(record.requiresAll).length
+      ? { requiresAll: normalizeRequirementList(record.requiresAll) }
+      : {}),
   };
 }
 
@@ -259,6 +267,9 @@ function normalizeUpgrade(raw, resourceIds, factoryIds) {
     effect,
     purchased: raw.purchased === true,
     requires: normalizeRequirement(raw.requires),
+    ...(normalizeRequirementList(raw.requiresAll).length
+      ? { requiresAll: normalizeRequirementList(raw.requiresAll) }
+      : {}),
   };
 }
 

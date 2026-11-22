@@ -37,15 +37,27 @@ export function requirementReason(group, requires) {
   return null;
 }
 
+export function requirementsReason(group, requires, requiresAll = []) {
+  for (const requirement of [requires, ...(requiresAll ?? [])]) {
+    const reason = requirementReason(group, requirement);
+    if (reason) return reason;
+  }
+  return null;
+}
+
 /** 工厂锁定原因；已拥有 >0 的工厂视为已经解锁，可继续购买。 */
 export function factoryLockReason(group, factory) {
   if ((parseNum(factory.owned) || 0) >= 1) return null;
-  return requirementReason(group, factory.requires);
+  return requirementsReason(group, factory.requires, factory.requiresAll);
 }
 
 /** 升级锁定原因：前置条件 + 目标工厂首台 + 自动产出升级是否仍有意义。 */
 export function upgradeLockReason(group, upgrade) {
-  const requirement = requirementReason(group, upgrade.requires);
+  const requirement = requirementsReason(
+    group,
+    upgrade.requires,
+    upgrade.requiresAll,
+  );
   if (requirement) return requirement;
   const target = group.factories.find((factory) => factory.id === upgrade.targetFactoryId);
   if (!target || (parseNum(target.owned) || 0) < 1) {

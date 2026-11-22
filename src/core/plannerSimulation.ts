@@ -76,16 +76,37 @@ export function requirementMet(state: PlannerState, requires?: Requirement | nul
   return state.completedUpgrades.has(requires.id);
 }
 
+export function requirementsMet(
+  state: PlannerState,
+  requires?: Requirement | null,
+  requiresAll?: Requirement[],
+) {
+  return (
+    requirementMet(state, requires) &&
+    (requiresAll ?? []).every((requirement) => requirementMet(state, requirement))
+  );
+}
+
 export function factoryActionable(state: PlannerState, factoryId: string) {
   const factory = state.factories.find((item) => item.id === factoryId);
-  return !!factory && (factory.owned > 0 || requirementMet(state, factory.requires));
+  return (
+    !!factory &&
+    (factory.owned > 0 ||
+      requirementsMet(state, factory.requires, factory.requiresAll))
+  );
 }
 
 export function upgradeActionable(state: PlannerState, upgradeId: string) {
   const upgrade = state.upgrades.find((item) => item.id === upgradeId);
   if (!upgrade || upgrade.purchased) return false;
   const target = state.factories.find((factory) => factory.id === upgrade.targetFactoryId);
-  if (!target || target.owned < 1 || !requirementMet(state, upgrade.requires)) return false;
+  if (
+    !target ||
+    target.owned < 1 ||
+    !requirementsMet(state, upgrade.requires, upgrade.requiresAll)
+  ) {
+    return false;
+  }
   // 工厂已经在自动产出时，再买解锁升级没有收益。
   if (upgrade.effect === 'activate' && target.active !== false) return false;
   return true;

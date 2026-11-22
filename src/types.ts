@@ -31,6 +31,7 @@ export interface RawFactory {
   /** 是否正在自动产出；false 时不计产出，直到购买“解锁自动产出”升级。 */
   active?: boolean;
   requires?: Requirement | null;
+  requiresAll?: Requirement[];
 }
 
 export interface RawUpgrade {
@@ -43,6 +44,7 @@ export interface RawUpgrade {
   effect?: UpgradeEffect;
   purchased: boolean;
   requires?: Requirement | null;
+  requiresAll?: Requirement[];
 }
 
 export interface RawPreset {
@@ -87,6 +89,7 @@ export interface FactoryState {
   costResourceId: string;
   active?: boolean;
   requires?: Requirement | null;
+  requiresAll?: Requirement[];
   contributionMultiplier?: number;
 }
 
@@ -100,6 +103,7 @@ export interface UpgradeState {
   effect?: UpgradeEffect;
   purchased: boolean;
   requires?: Requirement | null;
+  requiresAll?: Requirement[];
 }
 
 export interface SimulationState {

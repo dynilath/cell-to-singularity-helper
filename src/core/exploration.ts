@@ -76,6 +76,7 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
         costResourceId: factory.costResourceId,
         active: factory.active !== false,
         requires: factory.requires ?? null,
+        ...(factory.requiresAll?.length ? { requiresAll: factory.requiresAll } : {}),
       };
     })
     .filter(Boolean) as FactoryState[];
@@ -117,6 +118,7 @@ export function buildState(group: any, options: BuildStateOptions = {}): BuildSt
         effect,
         purchased: upgrade.purchased === true,
         requires: upgrade.requires ?? null,
+        ...(upgrade.requiresAll?.length ? { requiresAll: upgrade.requiresAll } : {}),
       };
     })
     .filter(Boolean) as UpgradeState[];

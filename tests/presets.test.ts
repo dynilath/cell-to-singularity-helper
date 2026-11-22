@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRESETS, PRESET_DOC_LEVEL, buildPresetStore } from '../src/data/presets.ts';
-import { RESOURCE_EMOJIS } from '../src/data/schema.ts';
+import { RESOURCE_EMOJIS, normalizeStore } from '../src/data/schema.ts';
 import { buildState } from '../src/core/exploration.ts';
 import { planStateSpace } from '../src/core/statePlanner.ts';
 
@@ -272,6 +272,10 @@ describe('universe preset', () => {
     expect(findFactory(store, '建造').requires.id).toBe(
       store.upgrades.find((upgrade) => upgrade.name === '经费').id,
     );
+    expect(findFactory(store, '发射')).toMatchObject({
+      price: '120B',
+      unit: '5.00M',
+    });
     expect(findFactory(store, '发射').requires.id).toBe(
       store.upgrades.find((upgrade) => upgrade.name === '推迟发射').id,
     );
@@ -305,6 +309,18 @@ describe('universe preset', () => {
       multiplier: '2',
       targetFactoryId: findFactory(store, '发射').id,
     });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '遮阳板展开').requiresAll).toEqual([
+      { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '遮阳板').id },
+      { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === 'L2 飞行之旅').id },
+    ]);
+    const normalized = normalizeStore(store, Date.now());
+    expect(
+      normalized.upgrades.find((upgrade) => upgrade.name === '遮阳板展开').requiresAll,
+    ).toHaveLength(2);
+    expect(store.upgrades.find((upgrade) => upgrade.name === '镜片展开').requiresAll).toEqual([
+      { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '六角镜').id },
+      { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '遮阳板展开').id },
+    ]);
   });
 });
 

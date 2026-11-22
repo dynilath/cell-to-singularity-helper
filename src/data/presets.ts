@@ -372,7 +372,7 @@ export const PRESETS: Preset[] = [
       { name: '詹姆斯·韦布望远镜', cost: 50000, output: 40, costResource: 'honeycomb', outputResource: 'honeycomb', unlock: '哈勃继任者' },
       { name: '研发', cost: 6e7, output: 4000, costResource: 'honeycomb', outputResource: 'honeycomb', unlock: '任务目标' },
       { name: '建造', cost: 2.5e10, output: 6e5, costResource: 'honeycomb', outputResource: 'honeycomb', unlock: '经费' },
-      { name: '发射', cost: 1.2e11, output: 3.25e6, costResource: 'honeycomb', outputResource: 'honeycomb', unlock: '推迟发射' },
+      { name: '发射', cost: 1.2e11, output: 5e6, costResource: 'honeycomb', outputResource: 'honeycomb', unlock: '推迟发射' },
     ],
     upgrades: [
       { name: '太空望远镜', cost: 150, costResource: 'honeycomb', unlock: '地面望远镜', effect: { kind: 'factory', target: '地面望远镜', multiplier: 2 } },
@@ -403,8 +403,8 @@ export const PRESETS: Preset[] = [
       { name: '地面支持', cost: 4e12, costResource: 'honeycomb', unlock: '发射', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 1001 } },
       { name: '圣诞发射', cost: 1e12, costResource: 'honeycomb', unlock: '发射', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
       { name: 'L2 飞行之旅', cost: 2.5e12, costResource: 'honeycomb', unlock: '圣诞发射', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
-      { name: '遮阳板展开', cost: 1.2e13, costResource: 'honeycomb', unlock: 'L2 飞行之旅', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
-      { name: '镜片展开', cost: 2e13, costResource: 'honeycomb', unlock: '遮阳板展开', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
+      { name: '遮阳板展开', cost: 1.2e13, costResource: 'honeycomb', unlock: '遮阳板 + L2 飞行之旅', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
+      { name: '镜片展开', cost: 2e13, costResource: 'honeycomb', unlock: '六角镜 + 遮阳板展开', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
       { name: '副镜', cost: 4e13, costResource: 'honeycomb', unlock: '镜片展开', effect: { kind: 'factory', target: '发射', multiplier: 3 } },
       { name: '主镜', cost: 9e13, costResource: 'honeycomb', unlock: '镜片展开', effect: { kind: 'factory', target: '发射', multiplier: 3 } },
       { name: '热身期', cost: 3e14, costResource: 'honeycomb', unlock: '主镜', effect: { kind: 'factory', target: '发射', multiplier: 4 } },
@@ -422,7 +422,7 @@ function parseUnlock(
   factoryIdByName: Map<string, string>,
   upgradeIdByName: Map<string, string>,
 ): Requirement | null {
-  if (!unlock || unlock === '无') return null;
+  if (!unlock || unlock === '无' || unlock === '-') return null;
   const match = /^(.*?)(?:x(\d+))?$/.exec(unlock);
   const name = match?.[1] ?? unlock;
   const count = match?.[2] ? Number(match[2]) : 1;
@@ -433,6 +433,24 @@ function parseUnlock(
   const upgradeId = upgradeIdByName.get(name);
   if (upgradeId) return { type: 'upgrade', id: upgradeId };
   return null;
+}
+
+function parseUnlockList(
+  unlock: string | undefined,
+  factoryIdByName: Map<string, string>,
+  upgradeIdByName: Map<string, string>,
+): Requirement[] {
+  if (!unlock || unlock === '无' || unlock === '-') return [];
+  return unlock
+    .split(/\s*\+\s*/)
+    .map((part) => parseUnlock(part, factoryIdByName, upgradeIdByName))
+    .filter(Boolean) as Requirement[];
+}
+
+function requirementFields(requirements: Requirement[]) {
+  if (requirements.length === 0) return { requires: null };
+  if (requirements.length === 1) return { requires: requirements[0] };
+  return { requires: null, requiresAll: requirements };
 }
 
 /** 生成可直接写入存档的预设状态。 */
@@ -493,7 +511,9 @@ export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now 
     outputResourceId: resolveResource(factory.outputResource),
     costResourceId: resolveResource(factory.costResource),
     active: true,
-    requires: parseUnlock(factory.unlock, factoryIdByName, upgradeIdByName),
+    ...requirementFields(
+      parseUnlockList(factory.unlock, factoryIdByName, upgradeIdByName),
+    ),
   }));
 
   const upgrades = importedUpgrades.map((upgrade, index) => ({
@@ -505,7 +525,9 @@ export function buildPresetStore(preset: Preset, { level, badgePercent = 0, now 
     multiplier: presetNumber(upgrade.effect.multiplier ?? 1),
     effect: 'multiply',
     purchased: false,
-    requires: parseUnlock(upgrade.unlock, factoryIdByName, upgradeIdByName),
+    ...requirementFields(
+      parseUnlockList(upgrade.unlock, factoryIdByName, upgradeIdByName),
+    ),
   }));
 
   return {

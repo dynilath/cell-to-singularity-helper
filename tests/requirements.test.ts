@@ -42,6 +42,25 @@ describe('prerequisites', () => {
     expect(upgradeLockReason(group, banik)).toBeNull();
   });
 
+  it('requires every condition in a multi-prerequisite upgrade', () => {
+    const group = buildPresetStore(
+      PRESETS.find((item) => item.id === 'universe'),
+      { level: 1, badgePercent: 0 },
+    );
+    const launch = group.factories.find((item) => item.name === '发射');
+    launch.owned = '1';
+    const sunshade = group.upgrades.find((item) => item.name === '遮阳板');
+    const l2 = group.upgrades.find((item) => item.name === 'L2 飞行之旅');
+    const deploy = group.upgrades.find((item) => item.name === '遮阳板展开');
+    expect(upgradeLockReason(group, deploy)).toContain('遮阳板');
+
+    group.completedUpgrades.push(sunshade.id);
+    expect(upgradeLockReason(group, deploy)).toContain('L2 飞行之旅');
+
+    group.completedUpgrades.push(l2.id);
+    expect(upgradeLockReason(group, deploy)).toBeNull();
+  });
+
   it('needs an auto-production upgrade only while its factory is inactive', () => {
     const group = presetGroup();
     const factory = group.factories[0];

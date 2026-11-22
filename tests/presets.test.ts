@@ -305,6 +305,10 @@ describe('universe preset', () => {
       multiplier: '1.00K',
       targetFactoryId: findFactory(store, '詹姆斯·韦布望远镜').id,
     });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '热身期').requiresAll).toEqual([
+      { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '主镜').id },
+      { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '副镜').id },
+    ]);
     expect(store.upgrades.find((upgrade) => upgrade.name === '第一批图像')).toMatchObject({
       multiplier: '2',
       targetFactoryId: findFactory(store, '发射').id,

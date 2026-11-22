@@ -407,7 +407,7 @@ export const PRESETS: Preset[] = [
       { name: '镜片展开', cost: 2e13, costResource: 'honeycomb', unlock: '六角镜 + 遮阳板展开', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
       { name: '副镜', cost: 4e13, costResource: 'honeycomb', unlock: '镜片展开', effect: { kind: 'factory', target: '发射', multiplier: 3 } },
       { name: '主镜', cost: 9e13, costResource: 'honeycomb', unlock: '镜片展开', effect: { kind: 'factory', target: '发射', multiplier: 3 } },
-      { name: '热身期', cost: 3e14, costResource: 'honeycomb', unlock: '主镜', effect: { kind: 'factory', target: '发射', multiplier: 4 } },
+      { name: '热身期', cost: 3e14, costResource: 'honeycomb', unlock: '主镜 + 副镜', effect: { kind: 'factory', target: '发射', multiplier: 4 } },
       { name: '第一批图像', cost: 1e15, costResource: 'honeycomb', unlock: '热身期', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
     ],
   },

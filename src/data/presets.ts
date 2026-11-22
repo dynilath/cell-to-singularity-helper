@@ -387,7 +387,7 @@ export const PRESETS: Preset[] = [
       { name: '命名', cost: 3e6, costResource: 'honeycomb', unlock: '詹姆斯·E·韦伯', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 2 } },
       { name: '尺寸对比', cost: 7e6, costResource: 'honeycomb', unlock: '与地球的距离', effect: { kind: 'factory', target: '哈勃望远镜', multiplier: 3 } },
       { name: '洗清嫌疑', cost: 4e8, costResource: 'honeycomb', unlock: '命名', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 3.5 } },
-      { name: '任务时长', cost: 2.5e9, costResource: 'honeycomb', unlock: '任务目标', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 3 } },
+      { name: '任务时长', cost: 2.5e9, costResource: 'honeycomb', unlock: '任务目标', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 2.5 } },
       { name: '预算', cost: 6e9, costResource: 'honeycomb', unlock: '研发', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 2 } },
       { name: '黑洞', cost: 2e8, costResource: 'honeycomb', unlock: '研发', effect: { kind: 'factory', target: '研发', multiplier: 2 } },
       { name: '星系诞生', cost: 1.2e9, costResource: 'honeycomb', unlock: '黑洞', effect: { kind: 'factory', target: '研发', multiplier: 2 } },

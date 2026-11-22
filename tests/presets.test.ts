@@ -289,6 +289,10 @@ describe('universe preset', () => {
       multiplier: '1.5',
       targetFactoryId: findFactory(store, '哈勃望远镜').id,
     });
+    expect(store.upgrades.find((upgrade) => upgrade.name === '任务时长')).toMatchObject({
+      multiplier: '2.5',
+      targetFactoryId: findFactory(store, '詹姆斯·韦布望远镜').id,
+    });
     expect(store.upgrades.find((upgrade) => upgrade.name === '命名')).toMatchObject({
       multiplier: '2',
       targetFactoryId: findFactory(store, '詹姆斯·韦布望远镜').id,

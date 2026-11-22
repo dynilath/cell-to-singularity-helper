@@ -1,6 +1,12 @@
 import { fmtDur, fmtNum, setNotationMode, parseNum } from './core/numbers.ts';
 import { buildState, factoryQuote } from './core/exploration.ts';
-import { cleanResourceText, PLAN_VERSION, resourceLabel } from './data/schema.ts';
+import {
+  cleanResourceText,
+  LEGACY_STORAGE,
+  PLAN_VERSION,
+  resourceLabel,
+  STORAGE_KEY,
+} from './data/schema.ts';
 import { buildSaveText, parseSaveText, saveFileName } from './data/saveFile.ts';
 import { factoryLockReason, upgradeLockReason } from './data/requirements.ts';
 import { buildPresetStore } from './data/presets.ts';
@@ -998,12 +1004,43 @@ export function createApp({
   }
 
   function setupReset() {
-    const button = byId(document, 'reset-data');
-    button.addEventListener('click', () => {
+    function reloadPage() {
+      try {
+        reload();
+      } catch {
+        // 某些嵌入式环境不允许刷新；数据已清空，下次打开会使用初始状态。
+      }
+    }
+
+    function removeStorageKeys(keys) {
+      try {
+        for (const key of keys) storage.removeItem(key);
+      } catch {
+        // localStorage 不可用时仍然尝试刷新页面。
+      }
+    }
+
+    const dataKeys = [STORAGE_KEY, ...Object.values(LEGACY_STORAGE)];
+
+    const dataButton = byId(document, 'reset-data');
+    dataButton.addEventListener('click', () => {
       const confirmed =
         typeof window.confirm === 'function'
           ? window.confirm(
-              '确定重置全部数据？\n\n将清空资源、工厂、升级、计划、提醒、预设状态和设置，恢复初始状态，且不可撤销。',
+              '确定重置数据？\n\n将清空资源、工厂、升级、计划、提醒和预设状态；音量、数字格式、离线倍率等设置会保留。此操作不可撤销。',
+            )
+          : true;
+      if (!confirmed) return;
+      removeStorageKeys(dataKeys);
+      reloadPage();
+    });
+
+    const allButton = byId(document, 'reset-all');
+    allButton.addEventListener('click', () => {
+      const confirmed =
+        typeof window.confirm === 'function'
+          ? window.confirm(
+              '确定重置全部？\n\n将清空资源、工厂、升级、计划、提醒、预设状态以及所有设置，恢复初始状态，且不可撤销。',
             )
           : true;
       if (!confirmed) return;
@@ -1013,15 +1050,11 @@ export function createApp({
           const key = storage.key(index);
           if (key?.startsWith('cts_')) keys.push(key);
         }
-        for (const key of keys) storage.removeItem(key);
+        removeStorageKeys(keys);
       } catch {
-        // localStorage 不可用时仍然尝试刷新页面。
+        // 同上。
       }
-      try {
-        reload();
-      } catch {
-        // 某些嵌入式环境不允许刷新；数据已清空，下次打开会使用初始状态。
-      }
+      reloadPage();
     });
   }
 

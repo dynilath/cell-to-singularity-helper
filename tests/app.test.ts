@@ -1569,11 +1569,38 @@ describe('reset', () => {
     expect(context.window.localStorage.length).toBe(before);
   });
 
-  it('removes every cts key and reloads after confirmation', () => {
+  it('resets data but preserves preferences by default', () => {
     const reload = vi.fn();
-    const context = boot(sampleStore(), {}, { reload });
+    const context = boot(
+      sampleStore(),
+      {
+        [SETTING_KEYS.offlineRate]: '2.1',
+        [SETTING_KEYS.notation]: 'chinese',
+        [SETTING_KEYS.volume]: '0.4',
+      },
+      { reload },
+    );
     context.window.confirm = vi.fn(() => true);
     click(context, '#reset-data');
+    expect(reload).toHaveBeenCalled();
+    expect(context.window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(context.window.localStorage.getItem(SETTING_KEYS.offlineRate)).toBe('2.1');
+    expect(context.window.localStorage.getItem(SETTING_KEYS.notation)).toBe('chinese');
+    expect(context.window.localStorage.getItem(SETTING_KEYS.volume)).toBe('0.4');
+  });
+
+  it('can reset every cts key including preferences', () => {
+    const reload = vi.fn();
+    const context = boot(
+      sampleStore(),
+      {
+        [SETTING_KEYS.offlineRate]: '2.1',
+        [SETTING_KEYS.notation]: 'chinese',
+      },
+      { reload },
+    );
+    context.window.confirm = vi.fn(() => true);
+    click(context, '#reset-all');
     expect(reload).toHaveBeenCalled();
     const keys = [];
     for (let index = 0; index < context.window.localStorage.length; index += 1) {

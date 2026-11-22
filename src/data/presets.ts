@@ -29,7 +29,8 @@ interface PresetFactory {
   output: number;
   costResource?: string;
   outputResource?: string;
-  unlock?: string;
+  /** 单个解锁名，或多个并列前提的结构化列表。 */
+  unlock?: string | string[];
   growth?: number;
 }
 
@@ -44,7 +45,8 @@ interface PresetUpgrade {
   name: string;
   cost: number;
   costResource?: string;
-  unlock?: string;
+  /** 单个解锁名，或多个并列前提的结构化列表。 */
+  unlock?: string | string[];
   effect: PresetUpgradeEffect;
 }
 
@@ -403,11 +405,11 @@ export const PRESETS: Preset[] = [
       { name: '地面支持', cost: 4e12, costResource: 'honeycomb', unlock: '发射', effect: { kind: 'factory', target: '詹姆斯·韦布望远镜', multiplier: 1001 } },
       { name: '圣诞发射', cost: 1e12, costResource: 'honeycomb', unlock: '发射', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
       { name: 'L2 飞行之旅', cost: 2.5e12, costResource: 'honeycomb', unlock: '圣诞发射', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
-      { name: '遮阳板展开', cost: 1.2e13, costResource: 'honeycomb', unlock: '遮阳板 + L2 飞行之旅', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
-      { name: '镜片展开', cost: 2e13, costResource: 'honeycomb', unlock: '六角镜 + 遮阳板展开', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
+      { name: '遮阳板展开', cost: 1.2e13, costResource: 'honeycomb', unlock: ['遮阳板', 'L2 飞行之旅'], effect: { kind: 'factory', target: '发射', multiplier: 2 } },
+      { name: '镜片展开', cost: 2e13, costResource: 'honeycomb', unlock: ['六角镜', '遮阳板展开'], effect: { kind: 'factory', target: '发射', multiplier: 2 } },
       { name: '副镜', cost: 4e13, costResource: 'honeycomb', unlock: '镜片展开', effect: { kind: 'factory', target: '发射', multiplier: 3 } },
       { name: '主镜', cost: 9e13, costResource: 'honeycomb', unlock: '镜片展开', effect: { kind: 'factory', target: '发射', multiplier: 3 } },
-      { name: '热身期', cost: 3e14, costResource: 'honeycomb', unlock: '主镜 + 副镜', effect: { kind: 'factory', target: '发射', multiplier: 4 } },
+      { name: '热身期', cost: 3e14, costResource: 'honeycomb', unlock: ['主镜', '副镜'], effect: { kind: 'factory', target: '发射', multiplier: 4 } },
       { name: '第一批图像', cost: 1e15, costResource: 'honeycomb', unlock: '热身期', effect: { kind: 'factory', target: '发射', multiplier: 2 } },
     ],
   },
@@ -436,14 +438,17 @@ function parseUnlock(
 }
 
 function parseUnlockList(
-  unlock: string | undefined,
+  unlock: string | string[] | undefined,
   factoryIdByName: Map<string, string>,
   upgradeIdByName: Map<string, string>,
 ): Requirement[] {
-  if (!unlock || unlock === '无' || unlock === '-') return [];
-  return unlock
-    .split(/\s*\+\s*/)
-    .map((part) => parseUnlock(part, factoryIdByName, upgradeIdByName))
+  const names = Array.isArray(unlock)
+    ? unlock
+    : unlock
+      ? [unlock]
+      : [];
+  return names
+    .map((name) => parseUnlock(name, factoryIdByName, upgradeIdByName))
     .filter(Boolean) as Requirement[];
 }
 

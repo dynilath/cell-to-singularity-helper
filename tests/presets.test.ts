@@ -317,6 +317,15 @@ describe('universe preset', () => {
       { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === '遮阳板').id },
       { type: 'upgrade', id: store.upgrades.find((upgrade) => upgrade.name === 'L2 飞行之旅').id },
     ]);
+    expect(
+      universePreset.upgrades.find((upgrade) => upgrade.name === '遮阳板展开').unlock,
+    ).toEqual(['遮阳板', 'L2 飞行之旅']);
+    expect(
+      universePreset.upgrades.find((upgrade) => upgrade.name === '镜片展开').unlock,
+    ).toEqual(['六角镜', '遮阳板展开']);
+    expect(
+      universePreset.upgrades.find((upgrade) => upgrade.name === '热身期').unlock,
+    ).toEqual(['主镜', '副镜']);
     const normalized = normalizeStore(store, Date.now());
     expect(
       normalized.upgrades.find((upgrade) => upgrade.name === '遮阳板展开').requiresAll,
